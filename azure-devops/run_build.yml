@@ -37,6 +37,7 @@ jobs:
       inputs:
         vcpkgArguments: 'boost-math:${{ parameters.targetPlatform }}-windows'
         vcpkgDirectory: '$(vcpkgLocation)'
+        vcpkgTriplet: ${{ parameters.targetPlatform }}-windows
     - task: run-cmake@0
       displayName: 'Build Support Tools'
       timeoutInMinutes: 2
