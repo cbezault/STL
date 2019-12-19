@@ -5,7 +5,7 @@ jobs:
 - job: ${{ parameters.targetPlatform }}
   pool:
     name: STL
-    demands: agent.osArchitecture -equals 'AMD64'
+    demands: Agent.OSArchitecture -equals 'X64'
   variables:
     vcpkgLocation: '$(Build.SourcesDirectory)/vcpkg'
   steps:
@@ -57,7 +57,7 @@ jobs:
         arguments: '$(Build.ArtifactStagingDirectory)/tools/parallelize/parallelize.exe'
     - task: BatchScript@1
       displayName: 'Validate Files'
-      timeoutInMinutes: 2
+      timeoutInMinutes: 2MD
       condition: eq('${{ parameters.targetPlatform }}', 'x64')
       inputs:
         filename: 'azure-devops/validate-files.cmd'
