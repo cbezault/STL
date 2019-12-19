@@ -5,7 +5,7 @@ jobs:
 - job: ${{ parameters.targetPlatform }}
   pool:
     name: STL
-    demands: Architecture -equals 'x64'
+    demands: Agent.OSArchitecture -equals x64
   variables:
     vcpkgLocation: '$(Build.SourcesDirectory)/vcpkg'
   steps:
