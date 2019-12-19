@@ -57,7 +57,7 @@ jobs:
         arguments: '$(Build.ArtifactStagingDirectory)/tools/parallelize/parallelize.exe'
     - task: BatchScript@1
       displayName: 'Validate Files'
-      timeoutInMinutes: 2MD
+      timeoutInMinutes: 2
       condition: eq('${{ parameters.targetPlatform }}', 'x64')
       inputs:
         filename: 'azure-devops/validate-files.cmd'
