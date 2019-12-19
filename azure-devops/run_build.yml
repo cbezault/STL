@@ -82,6 +82,7 @@ jobs:
   pool:
     name: STL
     #demands: Agent.OSArchitecture -equals ARM64
+  steps:
   - task: Bash@3
     inputs:
       script: echo "Hello"
