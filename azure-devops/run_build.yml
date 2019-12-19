@@ -78,7 +78,7 @@ jobs:
         artifact: ${{ parameters.targetPlatform }}-STL
 - job: test_${{ parameters.targetPlatform }}
   dependsOn: ${{ parameters.targetPlatform }}
-  condition: and(succeeded(), in('{{ parameters.targetPlatform }}', 'arm', 'arm64'))
+  condition: and(succeeded(), in('${{ parameters.targetPlatform }}', 'arm', 'arm64'))
   pool:
     name: STL
     #demands: Agent.OSArchitecture -equals ARM64
