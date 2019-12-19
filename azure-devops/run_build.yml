@@ -76,7 +76,7 @@ jobs:
       inputs:
         path: $(Build.ArtifactStagingDirectory)/${{ parameters.targetPlatform }}
         artifact: ${{ parameters.targetPlatform }}-STL
-- job: test-${{ parameters.targetPlatform }}
+- job: test_${{ parameters.targetPlatform }}
   dependsOn: ${{ parameters.targetPlatform }}
   condition: and(succeeded(), in('{{ parameters.targetPlatform }}', 'arm', 'arm64'))
   pool:
