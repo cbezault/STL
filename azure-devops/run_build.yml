@@ -5,6 +5,7 @@ jobs:
 - job: ${{ parameters.targetPlatform }}
   pool:
     name: STL
+    demands: agent.osArchitecture -eq 'AMD64'
 
   variables:
     vcpkgLocation: '$(Build.SourcesDirectory)/vcpkg'
@@ -71,3 +72,15 @@ jobs:
         useVcpkgToolchainFile: true
         configurationRegexFilter: '.*${{ parameters.targetPlatform }}.*'
         buildDirectory: $(Build.ArtifactStagingDirectory)/${{ parameters.targetPlatform }}
+    - task: PublishPipelineArtifact@1
+      condition: in('${{ parameters.targetPlatform }}', 'arm', 'arm64')
+      inputs:
+        path: $(Build.ArtifactStagingDirectory)/${{ parameters.targetPlatform }}
+        artifact: ${{ parameters.targetPlatform }}-STL
+        #- job: test-${{ parameters.targetPlatform }}
+        #  condition: and(succeeded(), in('{{ parameters.targetPlatform }}', 'arm', 'arm64'))
+        #  dependsOn: ${{ parameters.targetPlatform }}
+        #  pool:
+        #    name: STL
+        #    demands:
+        #    - eq(agent.osArchitecture, 'ARM64')
