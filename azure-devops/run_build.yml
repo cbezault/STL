@@ -5,7 +5,7 @@ jobs:
 - job: ${{ parameters.targetPlatform }}
   pool:
     name: STL
-    demands: agent.osArchitecture -eq 'AMD64'
+    demands: eq(agent.osArchitecture, 'AMD64')
 
   variables:
     vcpkgLocation: '$(Build.SourcesDirectory)/vcpkg'
