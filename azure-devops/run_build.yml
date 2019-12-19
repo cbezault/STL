@@ -76,10 +76,12 @@ jobs:
       inputs:
         path: $(Build.ArtifactStagingDirectory)/${{ parameters.targetPlatform }}
         artifact: ${{ parameters.targetPlatform }}-STL
-        #- job: test-${{ parameters.targetPlatform }}
-        #  condition: and(succeeded(), in('{{ parameters.targetPlatform }}', 'arm', 'arm64'))
-        #  dependsOn: ${{ parameters.targetPlatform }}
-        #  pool:
-        #    name: STL
-        #    demands:
-        #    - eq(agent.osArchitecture, 'ARM64')
+- job: test-${{ parameters.targetPlatform }}
+  dependsOn: ${{ parameters.targetPlatform }}
+  condition: and(succeeded(), in('{{ parameters.targetPlatform }}', 'arm', 'arm64'))
+  pool:
+    name: STL
+    #demands: Agent.OSArchitecture -equals ARM64
+  - task: Bash@3
+    inputs:
+      script: echo "Hello"
