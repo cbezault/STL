@@ -81,7 +81,7 @@ jobs:
   condition: and(succeeded(), in('${{ parameters.targetPlatform }}', 'arm', 'arm64'))
   pool:
     name: STL
-    #demands: Agent.OSArchitecture -equals ARM64
+    demands: PROCESSOR_ARCHITEW6432 -equals ARM64
   steps:
   - task: Bash@3
     inputs:
