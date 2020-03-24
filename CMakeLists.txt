@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.17)
 set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
 project(msvc_standard_libraries LANGUAGES CXX)
 
@@ -24,6 +24,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "")
 set(CMAKE_CXX_FLAGS_RELEASE "")
 set(CMAKE_CXX_STANDARD_LIBRARIES "kernel32.lib")
 set(CMAKE_CXX_STANDARD_LIBRARIES_INIT "kernel32.lib")
+set(CMAKE_DEFAULT_CONFIGS "Release;Debug")
 set(CMAKE_MSVC_RUNTIME_LIBRARY "")
 
 if("${VCLIBS_TARGET_ARCHITECTURE}" MATCHES "^[xX]86$")
