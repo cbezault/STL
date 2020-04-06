@@ -403,77 +403,148 @@ include_directories(BEFORE
     "${CMAKE_CURRENT_LIST_DIR}/inc"
     "${TOOLSET_ROOT_DIR}/crt/src/concrt"
     "${TOOLSET_ROOT_DIR}/crt/src/vcruntime"
-    )
+)
 
-function(add_stl_dlls D_SUFFIX THIS_CONFIG_DEFINITIONS THIS_CONFIG_COMPILE_OPTIONS GL_FLAG THIS_CONFIG_LINK_OPTIONS)
+function(add_stl_dlls D_SUFFIX CLR_SUFFIX THIS_CONFIG_DEFINITIONS THIS_CONFIG_COMPILE_OPTIONS GL_FLAG THIS_CONFIG_LINK_OPTIONS)
+    set(CONCRT_LIBRARY ${TOOLSET_LIB}/concrt${D_SUFFIX}.lib)
+    set(MSVCRT_LIBRARY ${TOOLSET_LIB}/msvcrt${D_SUFFIX}.lib)
+    set(OUTPUT_SUFFIX ${D_SUFFIX}${CLR_SUFFIX}${VCLIBS_SUFFIX})
+    set(UCRT_LIBRARY ucrt${D_SUFFIX}.lib)
+    set(VCRUNTIME_LIBRARY ${TOOLSET_LIB}/vcruntime${D_SUFFIX}.lib)
+
     # msvcp140.dll
-    add_library(msvcp${D_SUFFIX}_objects OBJECT ${DLL_SOURCES} ${SOURCES})
-    target_compile_definitions(msvcp${D_SUFFIX}_objects PRIVATE "CRTDLL2;_DLL;${THIS_CONFIG_DEFINITIONS}")
-    target_compile_options(msvcp${D_SUFFIX}_objects PRIVATE "${THIS_CONFIG_COMPILE_OPTIONS};${GL_FLAG};/EHsc")
+    set(TARGET msvcp${D_SUFFIX}${CLR_SUFFIX})
+    set(OBJECT_TARGET ${TARGET}_objects)
+    set(EHA_OBJECT_TARGET ${TARGET}_eha_objects)
 
-    add_library(msvcp${D_SUFFIX}_eha_objects OBJECT ${EHA_SOURCES})
-    target_compile_definitions(msvcp${D_SUFFIX}_eha_objects PRIVATE "CRTDLL2;_DLL;${THIS_CONFIG_DEFINITIONS}")
-    target_compile_options(msvcp${D_SUFFIX}_eha_objects PRIVATE "${THIS_CONFIG_COMPILE_OPTIONS};${GL_FLAG};/EHa")
+    add_library(${OBJECT_TARGET} OBJECT ${DLL_SOURCES} ${SOURCES})
+    target_compile_definitions(${OBJECT_TARGET} PRIVATE "CRTDLL2;_DLL;${THIS_CONFIG_DEFINITIONS}")
+    target_compile_options(${OBJECT_TARGET} PRIVATE "${THIS_CONFIG_COMPILE_OPTIONS};${GL_FLAG};/EHsc")
 
-    add_library(msvcp${D_SUFFIX} SHARED)
-    target_link_libraries(msvcp${D_SUFFIX} PRIVATE msvcp${D_SUFFIX}_eha_objects msvcp${D_SUFFIX}_objects "${TOOLSET_LIB}/vcruntime${D_SUFFIX}.lib" "${TOOLSET_LIB}/msvcrt${D_SUFFIX}.lib" "ucrt${D_SUFFIX}.lib" "${TOOLSET_LIB}/concrt${D_SUFFIX}.lib" "delayimp.lib")
-    set_target_properties(msvcp${D_SUFFIX} PROPERTIES ARCHIVE_OUTPUT_NAME "msvcp140_base${D_SUFFIX}${VCLIBS_SUFFIX}")
-    set_target_properties(msvcp${D_SUFFIX} PROPERTIES ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
-    set_target_properties(msvcp${D_SUFFIX} PROPERTIES OUTPUT_NAME "msvcp140${D_SUFFIX}${VCLIBS_SUFFIX}")
-    target_link_options(msvcp${D_SUFFIX} PRIVATE "${THIS_CONFIG_LINK_OPTIONS};/delayload:concrt140${D_SUFFIX}.dll")
+    add_library(${EHA_OBJECT_TARGET} OBJECT ${EHA_SOURCES})
+    target_compile_definitions(${EHA_OBJECT_TARGET} PRIVATE "CRTDLL2;_DLL;${THIS_CONFIG_DEFINITIONS}")
+    target_compile_options(${EHA_OBJECT_TARGET} PRIVATE "${THIS_CONFIG_COMPILE_OPTIONS};${GL_FLAG};/EHa")
+
+    add_library(${TARGET} SHARED)
+    target_link_libraries(
+        ${TARGET}
+        PRIVATE ${EHA_OBJECT_TARGET}
+                ${OBJECT_TARGET}
+                ${VCRUNTIME_LIBRARY}
+                ${MSVCRT_LIBRARY}
+                ${UCRT_LIBRARY}
+                ${CONCRT_LIBRARY}
+                "delayimp.lib"
+    )
+    set_target_properties(${TARGET} PROPERTIES ARCHIVE_OUTPUT_NAME "msvcp140_base${OUTPUT_SUFFIX}")
+    set_target_properties(${TARGET} PROPERTIES ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+    set_target_properties(${TARGET} PROPERTIES OUTPUT_NAME "msvcp140${OUTPUT_SUFFIX}")
+    target_link_options(${TARGET} PRIVATE "${THIS_CONFIG_LINK_OPTIONS};/delayload:concrt140${D_SUFFIX}.dll")
 
     # import library 'statics'
-    add_library(msvcp${D_SUFFIX}_implib_objects OBJECT ${IMPLIB_SOURCES})
-    target_compile_definitions(msvcp${D_SUFFIX}_implib_objects PRIVATE "_DLL;${THIS_CONFIG_DEFINITIONS}")
-    target_compile_options(msvcp${D_SUFFIX}_implib_objects PRIVATE "${THIS_CONFIG_COMPILE_OPTIONS};/EHsc") # No /GL!
+    set(IMPORTLIB_OBJECT_TARGET ${TARGET}_implib_objects)
+
+    add_library(${IMPORTLIB_OBJECT_TARGET} OBJECT ${IMPLIB_SOURCES})
+    target_compile_definitions(${IMPORTLIB_OBJECT_TARGET} PRIVATE "_DLL;${THIS_CONFIG_DEFINITIONS}")
+    target_compile_options(${IMPORTLIB_OBJECT_TARGET} PRIVATE "${THIS_CONFIG_COMPILE_OPTIONS};/EHsc") # No /GL!
 
     # msvcp140_1.dll (the memory_resource satellite)
-    add_library(msvcp_1${D_SUFFIX}_objects OBJECT ${SOURCES_SATELLITE_1})
-    target_compile_definitions(msvcp_1${D_SUFFIX}_objects PRIVATE "_BUILDING_SATELLITE_1;_DLL;${THIS_CONFIG_DEFINITIONS}")
-    target_compile_options(msvcp_1${D_SUFFIX}_objects PRIVATE "${THIS_CONFIG_COMPILE_OPTIONS};${GL_FLAG};/EHsc")
+    set(SAT_1_TARGET msvcp_1${D_SUFFIX}${CLR_SUFFIX})
+    set(SAT_1_OBJECT_TARGET ${SAT_1_TARGET}_objects)
 
-    add_library(msvcp_1${D_SUFFIX} SHARED)
-    target_link_libraries(msvcp_1${D_SUFFIX} PRIVATE msvcp_1${D_SUFFIX}_objects "msvcp${D_SUFFIX}" "${TOOLSET_LIB}/vcruntime${D_SUFFIX}.lib" "${TOOLSET_LIB}/msvcrt${D_SUFFIX}.lib" "ucrt${D_SUFFIX}.lib")
-    set_target_properties(msvcp_1${D_SUFFIX} PROPERTIES ARCHIVE_OUTPUT_NAME "msvcp140_1${D_SUFFIX}${VCLIBS_SUFFIX}")
-    set_target_properties(msvcp_1${D_SUFFIX} PROPERTIES ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
-    set_target_properties(msvcp_1${D_SUFFIX} PROPERTIES OUTPUT_NAME "msvcp140_1${D_SUFFIX}${VCLIBS_SUFFIX}")
-    target_link_options(msvcp_1${D_SUFFIX} PRIVATE "${THIS_CONFIG_LINK_OPTIONS}")
+    add_library(${SAT_1_OBJECT_TARGET} OBJECT ${SOURCES_SATELLITE_1})
+    target_compile_definitions(${SAT_1_OBJECT_TARGET} PRIVATE "_BUILDING_SATELLITE_1;_DLL;${THIS_CONFIG_DEFINITIONS}")
+    target_compile_options(${SAT_1_OBJECT_TARGET} PRIVATE "${THIS_CONFIG_COMPILE_OPTIONS};${GL_FLAG};/EHsc")
+
+    add_library(${SAT_1_TARGET} SHARED)
+    target_link_libraries(
+        ${SAT_1_TARGET}
+        PRIVATE ${SAT_1_OBJECT_TARGET}
+                ${TARGET}
+                ${VCRUNTIME_LIBRARY}
+                ${MSVCRT_LIBRARY}
+                ${UCRT_LIBRARY}
+    )
+    set_target_properties(${SAT_1_TARGET} PROPERTIES ARCHIVE_OUTPUT_NAME "msvcp140_1${OUTPUT_SUFFIX}")
+    set_target_properties(${SAT_1_TARGET} PROPERTIES ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+    set_target_properties(${SAT_1_TARGET} PROPERTIES OUTPUT_NAME "msvcp140_1${OUTPUT_SUFFIX}")
+    target_link_options(${SAT_1_TARGET} PRIVATE "${THIS_CONFIG_LINK_OPTIONS}")
 
     # msvcp140_2.dll (the special math satellite)
-    add_library(msvcp_2${D_SUFFIX}_objects OBJECT ${SOURCES_SATELLITE_2})
-    target_compile_definitions(msvcp_2${D_SUFFIX}_objects PRIVATE "_BUILDING_SATELLITE_2;_DLL;${THIS_CONFIG_DEFINITIONS}")
-    target_compile_options(msvcp_2${D_SUFFIX}_objects PRIVATE "${THIS_CONFIG_COMPILE_OPTIONS};${GL_FLAG};/EHsc")
-    target_link_libraries(msvcp_2${D_SUFFIX}_objects PRIVATE Boost::headers Boost::disable_autolinking)
+    set(SAT_2_TARGET msvcp_2${D_SUFFIX}${CLR_SUFFIX})
+    set(SAT_2_OBJECT_TARGET ${SAT_2_TARGET}_objects)
 
-    add_library(msvcp_2${D_SUFFIX} SHARED)
-    target_link_libraries(msvcp_2${D_SUFFIX} PRIVATE msvcp_2${D_SUFFIX}_objects msvcp${D_SUFFIX}_implib_objects "msvcp${D_SUFFIX}" "${TOOLSET_LIB}/vcruntime${D_SUFFIX}.lib" "${TOOLSET_LIB}/msvcrt${D_SUFFIX}.lib" "ucrt${D_SUFFIX}.lib")
-    set_target_properties(msvcp_2${D_SUFFIX} PROPERTIES ARCHIVE_OUTPUT_NAME "msvcp140_2${D_SUFFIX}${VCLIBS_SUFFIX}")
-    set_target_properties(msvcp_2${D_SUFFIX} PROPERTIES ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
-    set_target_properties(msvcp_2${D_SUFFIX} PROPERTIES OUTPUT_NAME "msvcp140_2${D_SUFFIX}${VCLIBS_SUFFIX}")
-    target_link_options(msvcp_2${D_SUFFIX} PRIVATE "${THIS_CONFIG_LINK_OPTIONS}")
+    add_library(${SAT_2_OBJECT_TARGET} OBJECT ${SOURCES_SATELLITE_2})
+    target_compile_definitions(${SAT_2_OBJECT_TARGET} PRIVATE "_BUILDING_SATELLITE_2;_DLL;${THIS_CONFIG_DEFINITIONS}")
+    target_compile_options(${SAT_2_OBJECT_TARGET} PRIVATE "${THIS_CONFIG_COMPILE_OPTIONS};${GL_FLAG};/EHsc")
+    target_link_libraries(${SAT_2_OBJECT_TARGET} PRIVATE Boost::headers Boost::disable_autolinking)
+
+    add_library(${SAT_2_TARGET} SHARED)
+    target_link_libraries(
+        ${SAT_2_TARGET}
+        PRIVATE ${SAT_2_OBJECT_TARGET}
+                ${IMPORTLIB_OBJECT_TARGET}
+                ${TARGET}
+                ${VCRUNTIME_LIBRARY}
+                ${MSVCRT_LIBRARY}
+                ${UCRT_LIBRARY}
+    )
+    set_target_properties(${SAT_2_TARGET} PROPERTIES ARCHIVE_OUTPUT_NAME "msvcp140_2${OUTPUT_SUFFIX}")
+    set_target_properties(${SAT_2_TARGET} PROPERTIES ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+    set_target_properties(${SAT_2_TARGET} PROPERTIES OUTPUT_NAME "msvcp140_2${OUTPUT_SUFFIX}")
+    target_link_options(${SAT_2_TARGET} PRIVATE "${THIS_CONFIG_LINK_OPTIONS}")
 
     # msvcp140_codecvt_ids.dll
-    add_library(msvcp${D_SUFFIX}_codecvt_ids_objects OBJECT ${SOURCES_SATELLITE_CODECVT_IDS})
-    target_compile_definitions(msvcp${D_SUFFIX}_codecvt_ids_objects PRIVATE "_BUILDING_SATELLITE_CODECVT_IDS;_DLL;${THIS_CONFIG_DEFINITIONS}")
-    target_compile_options(msvcp${D_SUFFIX}_codecvt_ids_objects PRIVATE "${THIS_CONFIG_COMPILE_OPTIONS};${GL_FLAG};/EHsc")
+    set(CODECVT_TARGET msvcp${D_SUFFIX}_codecvt_ids${CLR_SUFFIX})
+    set(CODECVT_OBJECT_TARGET ${CODECVT_TARGET}_objects)
 
-    add_library(msvcp${D_SUFFIX}_codecvt_ids SHARED)
-    target_link_libraries(msvcp${D_SUFFIX}_codecvt_ids PRIVATE msvcp${D_SUFFIX}_codecvt_ids_objects "msvcp${D_SUFFIX}" "${TOOLSET_LIB}/vcruntime${D_SUFFIX}.lib" "${TOOLSET_LIB}/msvcrt${D_SUFFIX}.lib" "ucrt${D_SUFFIX}.lib")
-    set_target_properties(msvcp${D_SUFFIX}_codecvt_ids PROPERTIES ARCHIVE_OUTPUT_NAME "msvcp140_codecvt_ids${D_SUFFIX}${VCLIBS_SUFFIX}")
-    set_target_properties(msvcp${D_SUFFIX}_codecvt_ids PROPERTIES ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
-    set_target_properties(msvcp${D_SUFFIX}_codecvt_ids PROPERTIES OUTPUT_NAME "msvcp140${D_SUFFIX}_codecvt_ids${VCLIBS_SUFFIX}")
-    target_link_options(msvcp${D_SUFFIX}_codecvt_ids PRIVATE "${THIS_CONFIG_LINK_OPTIONS}")
+    add_library(${CODECVT_OBJECT_TARGET} OBJECT ${SOURCES_SATELLITE_CODECVT_IDS})
+    target_compile_definitions(
+        ${CODECVT_OBJECT_TARGET}
+        PRIVATE "_BUILDING_SATELLITE_CODECVT_IDS;_DLL;${THIS_CONFIG_DEFINITIONS}"
+    )
+    target_compile_options(${CODECVT_OBJECT_TARGET} PRIVATE "${THIS_CONFIG_COMPILE_OPTIONS};${GL_FLAG};/EHsc")
+
+    add_library(${CODECVT_TARGET} SHARED)
+    target_link_libraries(
+        ${CODECVT_TARGET}
+        PRIVATE ${CODECVT_OBJECT_TARGET}
+                ${TARGET}
+                ${VCRUNTIME_LIBRARY}
+                ${MSVCRT_LIBRARY}
+                ${UCRT_LIBRARY}
+    )
+    set_target_properties(
+        ${CODECVT_TARGET}
+        PROPERTIES ARCHIVE_OUTPUT_NAME "msvcp140_codecvt_ids${OUTPUT_SUFFIX}"
+    )
+    set_target_properties(${CODECVT_TARGET} PROPERTIES ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+    set_target_properties(${CODECVT_TARGET} PROPERTIES OUTPUT_NAME "msvcp140${D_SUFFIX}_codecvt_ids${CLR_SUFFIX}${VCLIBS_SUFFIX}")
+    target_link_options(${CODECVT_TARGET} PRIVATE "${THIS_CONFIG_LINK_OPTIONS}")
 
     # import library
-    add_library(msvcp${D_SUFFIX}_implib STATIC ${HEADERS})
-    target_link_libraries(msvcp${D_SUFFIX}_implib msvcp${D_SUFFIX}_implib_objects)
-    add_dependencies(msvcp${D_SUFFIX}_implib msvcp${D_SUFFIX} msvcp_1${D_SUFFIX} msvcp_2${D_SUFFIX} msvcp${D_SUFFIX}_codecvt_ids)
-    set_target_properties(msvcp${D_SUFFIX}_implib PROPERTIES STATIC_LIBRARY_OPTIONS "/NOLOGO;/NODEFAULTLIB;/IGNORE:4006;$<TARGET_LINKER_FILE:msvcp${D_SUFFIX}>;$<TARGET_LINKER_FILE:msvcp_1${D_SUFFIX}>;$<TARGET_LINKER_FILE:msvcp_2${D_SUFFIX}>;$<TARGET_LINKER_FILE:msvcp${D_SUFFIX}_codecvt_ids>")
-    set_target_properties(msvcp${D_SUFFIX}_implib PROPERTIES ARCHIVE_OUTPUT_NAME "msvcprt${D_SUFFIX}")
+    set(IMPORTLIB_TARGET ${TARGET}_implib)
+
+    add_library(${IMPORTLIB_TARGET} STATIC ${HEADERS})
+    target_link_libraries(${IMPORTLIB_TARGET} ${IMPORTLIB_OBJECT_TARGET})
+    add_dependencies(
+        ${IMPORTLIB_TARGET}
+        ${TARGET}
+        ${SAT_1_TARGET}
+        ${SAT_2_TARGET}
+        ${CODECVT_TARGET}
+    )
+    set_target_properties(
+        ${IMPORTLIB_TARGET}
+        PROPERTIES STATIC_LIBRARY_OPTIONS "/NOLOGO;/NODEFAULTLIB;/IGNORE:4006;$<TARGET_LINKER_FILE:${TARGET}>;$<TARGET_LINKER_FILE:${SAT_1_TARGET}>;$<TARGET_LINKER_FILE:${SAT_2_TARGET}>;$<TARGET_LINKER_FILE:${CODECVT_TARGET}>"
+    )
+    set_target_properties(${IMPORTLIB_TARGET} PROPERTIES ARCHIVE_OUTPUT_NAME "msvcprt${D_SUFFIX}${CLR_SUFFIX}")
 endfunction()
 
-add_stl_dlls("" "" "${VCLIBS_RELEASE_OPTIONS}" "/GL" "/LTCG;/opt:ref,icf")
-add_stl_dlls("d" "_DEBUG" "${VCLIBS_DEBUG_OPTIONS}" "" "/opt:ref,noicf")
+add_stl_dlls("" "" "" "${VCLIBS_RELEASE_OPTIONS}" "/GL" "/LTCG;/opt:ref,icf")
+add_stl_dlls("" "_clr" "" "${VCLIBS_RELEASE_OPTIONS}" "/GL" "/LTCG;/opt:ref,icf")
+add_stl_dlls("d" "" "_DEBUG" "${VCLIBS_DEBUG_OPTIONS}" "" "/opt:ref,noicf")
+add_stl_dlls("d" "_clr" "_DEBUG" "${VCLIBS_DEBUG_OPTIONS}" "" "/opt:ref,noicf")
 
 function(add_stl_statics FLAVOR_SUFFIX THIS_CONFIG_DEFINITIONS THIS_CONFIG_COMPILE_OPTIONS)
     add_library(libcpmt${FLAVOR_SUFFIX}_eha OBJECT ${EHA_SOURCES})
