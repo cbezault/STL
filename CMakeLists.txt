@@ -62,21 +62,26 @@ endif()
 
 add_compile_definitions(
     _ALLOW_ITERATOR_DEBUG_LEVEL_MISMATCH WIN32_LEAN_AND_MEAN STRICT _CRT_STDIO_ARBITRARY_WIDE_SPECIFIERS
-    _CRT_DECLARE_NONSTDC_NAMES=1 )
+    _CRT_DECLARE_NONSTDC_NAMES=1 $<$<CONFIG:Debug>:_DEBUG>
+)
 
 # TRANSITION, /analyze ?
-add_compile_options(/diagnostics:caret /W4 /WX /w14265 /w15038 /d1FastFail /guard:cf /Z7 /d2Zi+ /Gm- /Gy /Zp8 /std:c++latest /permissive- /Zc:threadSafeInit- /Zl)
+add_compile_options(
+    /diagnostics:caret /W4 /WX /w14265 /w15038 /d1FastFail /guard:cf /Z7 /d2Zi+ /Gm- /Gy /Zp8 /std:c++latest
+    /permissive- /Zc:threadSafeInit- /Zl $<IF:$<CONFIG:Debug>,/Od,/O2$<SEMICOLON>/Os>
+)
+
+add_link_options(
+    /DEBUG:FULL /WX /RELEASE /SUBSYSTEM:Console /NODEFAULTLIB /INCREMENTAL:NO /MANIFEST:NO /DLL /profile /guard:cf
+    /DEBUGTYPE:cv,fixup /LARGEADDRESSAWARE
+    $<IF:$<CONFIG:Debug>,/opt:ref$<COMMA>noicf,/LTCG$<SEMICOLON>/opt:ref$<COMMA>icf>
+)
+
+set_property(GLOBAL PROPERTY STATIC_LIBRARY_OPTIONS "/WX")
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/out/lib/${VCLIBS_I386_OR_AMD64}")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/out/lib/${VCLIBS_I386_OR_AMD64}")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/out/bin/${VCLIBS_I386_OR_AMD64}")
-
-set(CMAKE_STATIC_LINKER_FLAGS "/WX")
-set(CMAKE_STATIC_LINKER_FLAGS_DEBUG "")
-set(CMAKE_STATIC_LINKER_FLAGS_RELEASE "")
-set(CMAKE_SHARED_LINKER_FLAGS "/DEBUG:FULL /WX /RELEASE /SUBSYSTEM:Console /NODEFAULTLIB /INCREMENTAL:NO /MANIFEST:NO /DLL /profile /guard:cf /DEBUGTYPE:cv,fixup /LARGEADDRESSAWARE")
-set(CMAKE_SHARED_LINKER_FLAGS_DEBUG "")
-set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "")
 
 get_filename_component(TOOLSET_BINARIES_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY) # Example: $\VC\Tools\MSVC\14.23.27931\bin\Hostx86\x86
 get_filename_component(TOOLSET_ROOT_DIR "${TOOLSET_BINARIES_DIR}" DIRECTORY) # $\VC\Tools\MSVC\14.23.27931\bin\Hostx86
