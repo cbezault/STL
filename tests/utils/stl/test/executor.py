@@ -19,7 +19,7 @@ class Executor:
     def __init__(self):
         self.target_info = None
 
-    def run(self, cmd, local_cwd, file_deps=None, env=None):
+    def run(self, cmd, local_cwd, file_deps=None, env=None, output_files=None):
         """Execute a command.
             Be very careful not to change shared state in this function.
             Executor objects are shared between python processes in `lit -jN`.
@@ -53,7 +53,8 @@ class LocalExecutor(Executor):
         super(LocalExecutor, self).__init__()
         self.is_windows = platform.system() == 'Windows'
 
-    def run(self, cmd, work_dir='.', file_deps=None, env=None):
+    def run(self, cmd, work_dir='.', file_deps=None, env=None,
+            output_files=None):
         if str(work_dir) == '.':
             work_dir = os.getcwd()
 
@@ -63,11 +64,6 @@ class LocalExecutor(Executor):
         out, err, rc = executeCommand(cmd, cwd=work_dir, env=env)
         return (cmd, out, err, rc, False)
 
-class CMakeExecutor(Executor):
-    def __init__(self, output_file):
-        super(CMakeExecutor, self).__init__()
-    def run(self, cmd, work_dir='.', file_deps=None, env=None):
-        print(
 
 class PrefixExecutor(Executor):
     """Prefix an executor with some other command wrapper.
