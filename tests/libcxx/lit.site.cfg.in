@@ -5,10 +5,10 @@ import site
 site.addsitedir("@STL_TEST_UTILS_DIR@")
 
 config.configuration_variant       = "stl"
-config.cxx_archive_root            = "@CMAKE_ARCHIVE_OUTPUT_DIRECTORY@"
+config.cxx_archive_root            = "$<TARGET_FILE_DIR:msvcp_implib>"
 config.cxx_headers                 = "@STL_TESTED_HEADERS_DIR@"
-config.cxx_library_root            = "@CMAKE_LIBRARY_OUTPUT_DIRECTORY@"
-config.cxx_runtime_root            = "@CMAKE_RUNTIME_OUTPUT_DIRECTORY@"
+config.cxx_library_root            = "$<TARGET_FILE_DIR:msvcp_implib>"
+config.cxx_runtime_root            = "$<TARGET_FILE_DIR:msvcp>"
 config.envlst_path                 = "@LIBCXX_ENVLST@"
 config.expected_results_list_path  = "@LIBCXX_EXPECTED_RESULTS@"
 config.format_name                 = "LibcxxTestFormat"
@@ -19,6 +19,7 @@ config.stl_build_root              = "@STL_BUILD_ROOT@"
 config.stl_src_root                = "@STL_SOURCE_DIR@"
 config.target_arch                 = "@VCLIBS_TARGET_ARCHITECTURE@"
 config.test_subdirs                = ["@LIBCXX_SOURCE_DIR@/test/std"]
+config.available_features.add("$<LOWER_CASE:$<CONFIG>>")
 
 config.loaded_site_config = True
 lit_config.load_config(config, "@LIBCXX_SOURCE_DIR@/test/lit.cfg")

@@ -188,36 +188,38 @@ class STLTestFormat:
 
             report = ""
             for step in buildSteps:
-                cmd, out, err, rc = \
+                cmd, out, err, rc, force_pass = \
                     self.build_executor.run(step.cmd, step.work_dir,
                                             step.file_deps, step.env)
 
-                if step.should_fail and rc == 0:
-                    report += "Build step succeeded unexpectedly.\n"
-                elif rc != 0:
-                    report += "Build step failed unexpectedly.\n"
+                if not force_pass:
+                    if step.should_fail and rc == 0:
+                        report += "Build step succeeded unexpectedly.\n"
+                    elif rc != 0:
+                        report += "Build step failed unexpectedly.\n"
 
-                report += stl.util.makeReport(cmd, out, err, rc)
-                if (step.should_fail and rc == 0) or \
-                        (not step.should_fail and rc != 0):
-                    lit_config.note(report)
-                    return lit.Test.Result(fail_var, report)
+                    report += stl.util.makeReport(cmd, out, err, rc)
+                    if (step.should_fail and rc == 0) or \
+                            (not step.should_fail and rc != 0):
+                        lit_config.note(report)
+                        return lit.Test.Result(fail_var, report)
 
             for step in testSteps:
-                cmd, out, err, rc = \
+                cmd, out, err, rc, force_pass = \
                     self.test_executor.run(step.cmd, step.work_dir,
                                            step.file_deps, step.env)
 
-                if step.should_fail and rc == 0:
-                    report += "Test step succeeded unexpectedly.\n"
-                elif rc != 0:
-                    report += "Test step failed unexpectedly.\n"
+                if not force_pass:
+                    if step.should_fail and rc == 0:
+                        report += "Test step succeeded unexpectedly.\n"
+                    elif rc != 0:
+                        report += "Test step failed unexpectedly.\n"
 
-                report += stl.util.makeReport(cmd, out, err, rc)
-                if (step.should_fail and rc == 0) or \
-                        (not step.should_fail and rc != 0):
-                    lit_config.note(report)
-                    return lit.Test.Result(fail_var, report)
+                    report += stl.util.makeReport(cmd, out, err, rc)
+                    if (step.should_fail and rc == 0) or \
+                            (not step.should_fail and rc != 0):
+                        lit_config.note(report)
+                        return lit.Test.Result(fail_var, report)
 
             return lit.Test.Result(pass_var, report)
 

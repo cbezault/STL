@@ -36,9 +36,13 @@ class STLTest(Test):
 
         self._configure_cxx(lit_config, envlst_entry, default_cxx)
 
-        # TRANSITION: These configurations should be enabled in the future.
         for flag in chain(self.cxx.flags, self.cxx.compile_flags):
-            if flag.startswith('clr:pure', 1):
+            if flag[1:] in ('MDd', 'MTd', 'LDd'):
+                self.requires.append('debug')
+            elif flag[1:] in ('MD', 'MT', 'LD'):
+                self.requires.append('release')
+            # TRANSITION: These configurations should be enabled in the future.
+            elif flag.startswith('clr:pure', 1):
                 self.requires.append('clr_pure')
             elif flag.startswith('BE', 1):
                 self.requires.append('edg')

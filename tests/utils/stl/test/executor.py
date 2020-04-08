@@ -29,7 +29,7 @@ class Executor:
             file_deps: [str]: Files required by the cmd
             env: {str: str}:  Environment variables to execute under
         Returns:
-            cmd, out, err, exitCode
+            cmd, out, err, exitCode, force_pass
         """
         raise NotImplementedError
 
@@ -61,8 +61,13 @@ class LocalExecutor(Executor):
             env = self.merge_environments(os.environ, env)
 
         out, err, rc = executeCommand(cmd, cwd=work_dir, env=env)
-        return (cmd, out, err, rc)
+        return (cmd, out, err, rc, False)
 
+class CMakeExecutor(Executor):
+    def __init__(self, output_file):
+        super(CMakeExecutor, self).__init__()
+    def run(self, cmd, work_dir='.', file_deps=None, env=None):
+        print(
 
 class PrefixExecutor(Executor):
     """Prefix an executor with some other command wrapper.

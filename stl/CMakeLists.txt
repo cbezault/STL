@@ -408,10 +408,10 @@ include_directories(BEFORE
 set(GL_FLAG $<$<CONFIG:Release>:/GL>)
 set(D_SUFFIX $<$<CONFIG:Debug>:d>)
 
-set(CONCRT_LIBRARY ${TOOLSET_LIB}/concrt${D_SUFFIX}.lib)
-set(MSVCRT_LIBRARY ${TOOLSET_LIB}/msvcrt${D_SUFFIX}.lib)
+set(CONCRT_LIBRARY "${TOOLSET_LIB}/concrt${D_SUFFIX}.lib")
+set(MSVCRT_LIBRARY "${TOOLSET_LIB}/msvcrt${D_SUFFIX}.lib")
 set(UCRT_LIBRARY ucrt${D_SUFFIX}.lib)
-set(VCRUNTIME_LIBRARY ${TOOLSET_LIB}/vcruntime${D_SUFFIX}.lib)
+set(VCRUNTIME_LIBRARY "${TOOLSET_LIB}/vcruntime${D_SUFFIX}.lib")
 
 # msvcp140.dll
 add_library(msvcp_objects OBJECT ${DLL_SOURCES} ${SOURCES})
@@ -427,10 +427,10 @@ target_link_libraries(
     msvcp
     PRIVATE msvcp_eha_objects
             msvcp_objects
-            ${VCRUNTIME_LIBRARY}
-            ${MSVCRT_LIBRARY}
-            ${UCRT_LIBRARY}
-            ${CONCRT_LIBRARY}
+            "${VCRUNTIME_LIBRARY}"
+            "${MSVCRT_LIBRARY}"
+            "${UCRT_LIBRARY}"
+            "${CONCRT_LIBRARY}"
             delayimp.lib
 )
 set_target_properties(msvcp PROPERTIES ARCHIVE_OUTPUT_NAME msvcp140_base${D_SUFFIX}${VCLIBS_SUFFIX})
@@ -439,11 +439,9 @@ set_target_properties(msvcp PROPERTIES OUTPUT_NAME msvcp140${D_SUFFIX}${VCLIBS_S
 target_link_options(msvcp PRIVATE /delayload:concrt140${D_SUFFIX}.dll)
 
 # import library 'statics'
-set(IMPORTLIB_OBJECT_TARGET msvcp_implib_objects)
-
-add_library(${IMPORTLIB_OBJECT_TARGET} OBJECT ${IMPLIB_SOURCES})
-target_compile_definitions(${IMPORTLIB_OBJECT_TARGET} PRIVATE _DLL)
-target_compile_options(${IMPORTLIB_OBJECT_TARGET} PRIVATE /EHsc) # No /GL!
+add_library(msvcp_implib_objects OBJECT ${IMPLIB_SOURCES})
+target_compile_definitions(msvcp_implib_objects PRIVATE _DLL)
+target_compile_options(msvcp_implib_objects PRIVATE /EHsc) # No /GL!
 
 # msvcp140_1.dll (the memory_resource satellite)
 add_library(msvcp_1_objects OBJECT ${SOURCES_SATELLITE_1})
@@ -455,9 +453,9 @@ target_link_libraries(
     msvcp_1
     PRIVATE msvcp_1_objects
             msvcp
-            ${VCRUNTIME_LIBRARY}
-            ${MSVCRT_LIBRARY}
-            ${UCRT_LIBRARY}
+            "${VCRUNTIME_LIBRARY}"
+            "${MSVCRT_LIBRARY}"
+            "${UCRT_LIBRARY}"
 )
 set_target_properties(msvcp_1 PROPERTIES ARCHIVE_OUTPUT_NAME msvcp140_1${D_SUFFIX}${VCLIBS_SUFFIX})
 set_target_properties(msvcp_1 PROPERTIES ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
@@ -475,9 +473,9 @@ target_link_libraries(
     PRIVATE msvcp_2_objects
             msvcp_implib_objects
             msvcp
-            ${VCRUNTIME_LIBRARY}
-            ${MSVCRT_LIBRARY}
-            ${UCRT_LIBRARY}
+            "${VCRUNTIME_LIBRARY}"
+            "${MSVCRT_LIBRARY}"
+            "${UCRT_LIBRARY}"
 )
 set_target_properties(msvcp_2 PROPERTIES ARCHIVE_OUTPUT_NAME msvcp140_2${D_SUFFIX}${VCLIBS_SUFFIX})
 set_target_properties(msvcp_2 PROPERTIES ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
@@ -493,21 +491,15 @@ target_link_libraries(
     msvcp_codecvt_ids
     PRIVATE msvcp_codecvt_ids_objects
             msvcp
-            ${VCRUNTIME_LIBRARY}
-            ${MSVCRT_LIBRARY}
-            ${UCRT_LIBRARY}
+            "${VCRUNTIME_LIBRARY}"
+            "${MSVCRT_LIBRARY}"
+            "${UCRT_LIBRARY}"
 )
 set_target_properties(msvcp_codecvt_ids PROPERTIES ARCHIVE_OUTPUT_NAME msvcp140_codecvt_ids${D_SUFFIX}${VCLIBS_SUFFIX})
 set_target_properties(msvcp_codecvt_ids PROPERTIES ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
 set_target_properties(msvcp_codecvt_ids PROPERTIES OUTPUT_NAME msvcp140${D_SUFFIX}_codecvt_ids${VCLIBS_SUFFIX})
 
 # import library
-list(
-    APPEND IMPORTLIB_STATIC_LIBRARY_OPTIONS /NOLOGO /NODEFAULTLIB /IGNORE:4006
-                                            $<TARGET_LINKER_FILE:msvcp> $<TARGET_LINKER_FILE:msvcp_1>
-                                            $<TARGET_LINKER_FILE:msvcp_2> $<TARGET_LINKER_FILE:msvcp_codecvt_ids>
-)
-
 add_library(msvcp_implib STATIC ${HEADERS})
 target_link_libraries(msvcp_implib msvcp_implib_objects)
 add_dependencies(
@@ -517,7 +509,7 @@ add_dependencies(
     msvcp_2
     msvcp_codecvt_ids
 )
-set_target_properties(msvcp_implib PROPERTIES STATIC_LIBRARY_OPTIONS ${IMPORTLIB_STATIC_LIBRARY_OPTIONS})
+set_target_properties(msvcp_implib PROPERTIES STATIC_LIBRARY_OPTIONS "/NOLOGO;/NODEFAULTLIB;/IGNORE:4006;$<TARGET_LINKER_FILE:msvcp>;$<TARGET_LINKER_FILE:msvcp_1>;$<TARGET_LINKER_FILE:msvcp_2>;$<TARGET_LINKER_FILE:msvcp_codecvt_ids>")
 set_target_properties(msvcp_implib PROPERTIES ARCHIVE_OUTPUT_NAME msvcprt${D_SUFFIX})
 
 function(add_stl_statics FLAVOR_SUFFIX TARGET_SUFFIX THIS_CONFIG_DEFINITIONS)
