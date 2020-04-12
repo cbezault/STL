@@ -6,6 +6,7 @@
 #
 #===----------------------------------------------------------------------===##
 
+from pathlib import Path
 import platform
 import os
 import posixpath
@@ -19,17 +20,12 @@ class Executor:
     def __init__(self):
         self.target_info = None
 
-    def run(self, cmd, local_cwd, file_deps=None, env=None):
+    def run(self, test_info):
         """Execute a command.
             Be very careful not to change shared state in this function.
             Executor objects are shared between python processes in `lit -jN`.
-        Args:
-            cmd: [str]:       subprocess.call style command
-            local_cwd: str:   Local path to the working directory
-            file_deps: [str]: Files required by the cmd
-            env: {str: str}:  Environment variables to execute under
         Returns:
-            cmd, out, err, exitCode
+            cmd, out, err, exitCode, delayedExecution
         """
         raise NotImplementedError
 
@@ -48,20 +44,48 @@ class Executor:
         return result_env
 
 
+class ExternalExecutor(Executor):
+    def run(self, test_info):
+        work_dir = Path()
+        if str(test_info.work_dir) == '.':
+            work_dir = Path(os.getcwd())
+        else:
+            work_dir = test_info.work_dir
+
+        env = {}
+        if test_info.env:
+            env = self.merge_environments(os.environ, test_info.env)
+
+        out_cmd = 'cd "' + str(work_dir) + '"\n'
+
+        if env is not None:
+            for k, v in env.items():
+                out_cmd += 'set ' + k + '="' + v + '"\n'
+
+        out_cmd += ('\"%s\"\n' % '\" \"'.join(test_info.cmd))
+        print(out_cmd, file=test_info.out_handle)
+
+        return (test_info.cmd, '', '', 0, True)
+
+
 class LocalExecutor(Executor):
     def __init__(self):
         super(LocalExecutor, self).__init__()
         self.is_windows = platform.system() == 'Windows'
 
-    def run(self, cmd, work_dir='.', file_deps=None, env=None):
-        if str(work_dir) == '.':
-            work_dir = os.getcwd()
+    def run(self, test_info):
+        work_dir = Path()
+        if str(test_info.work_dir) == '.':
+            work_dir = Path(os.getcwd())
+        else:
+            work_dir = test_info.work_dir
 
-        if env:
-            env = self.merge_environments(os.environ, env)
+        env = {}
+        if test_info.env:
+            env = self.merge_environments(os.environ, test_info.env)
 
-        out, err, rc = executeCommand(cmd, cwd=work_dir, env=env)
-        return (cmd, out, err, rc)
+        out, err, rc = executeCommand(test_info.cmd, cwd=work_dir, env=env)
+        return (test_info.cmd, out, err, rc, False)
 
 
 class PrefixExecutor(Executor):

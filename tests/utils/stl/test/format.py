@@ -31,6 +31,82 @@ class TestStep:
     file_deps: List[os.PathLike] = field(default_factory=list)
     env: Dict[str, str] = field(default_factory=dict)
     should_fail: bool = field(default=False)
+    step_num: int = field(default=0)
+
+
+class STLStepProvider:
+    def getSteps(self, test, lit_config):
+        @dataclass
+        class SharedState:
+            exec_file: Optional[os.PathLike] = field(default=None)
+            exec_dir: os.PathLike = field(default_factory=Path)
+            count: int = field(default=0)
+
+        shared = SharedState()
+        return self.getBuildSteps(test, lit_config, shared), \
+            self.getTestSteps(test, lit_config, shared)
+
+    def getBuildSteps(self, test, lit_config, shared):
+        if not test.path_in_suite[-1].endswith('.fail.cpp'):
+            shared.exec_dir = test.getExecDir()
+            output_base = test.getOutputBaseName()
+            output_dir = test.getOutputDir()
+            source_path = Path(test.getSourcePath())
+
+            cmd, out_files, shared.exec_file = \
+                test.cxx.executeBasedOnFlagsCmd([source_path], output_dir,
+                                                shared.exec_dir, output_base,
+                                                [], [], [])
+
+            yield TestStep(cmd, shared.exec_dir, [source_path],
+                           test.cxx.compile_env)
+
+    def getTestSteps(self, test, lit_config, shared):
+        if shared.exec_file is not None:
+            exec_env = test.cxx.compile_env
+            exec_env['TMP'] = str(shared.exec_dir)
+
+            yield TestStep([str(shared.exec_file)], shared.exec_dir,
+                           [shared.exec_file], exec_env)
+        elif test.path_in_suite[-1].endswith('.fail.cpp'):
+            exec_dir = test.getExecDir()
+            source_path = Path(test.getSourcePath())
+
+            flags = []
+            if test.cxx.name == 'cl' and \
+                    ('/analyze' in test.cxx.flags or
+                     '/analyze' in test.cxx.compile_flags):
+                output_base = test.getOutputBaseName()
+                output_dir = test.getOutputDir()
+                analyze_path = output_dir / (output_base +
+                                             '.nativecodeanalysis.xml')
+                flags.append('/analyze:log' + str(analyze_path))
+
+            cmd, _ = test.cxx.compileCmd([source_path], os.devnull, flags)
+            yield TestStep(cmd, exec_dir, [source_path],
+                           test.cxx.compile_env, True)
+
+
+class STLDelayedExecutionStepProvider(STLStepProvider):
+    def getBuildSteps(self, test, lit_config, shared):
+        buildSteps = super().getBuildSteps(test, lit_config, shared)
+        build_base_name = test.getOutputBaseName() + '.build.cmd.'
+
+        for step, num in zip(buildSteps, itertools.count()):
+            build_file = test.getOutputDir() / (build_base_name + str(num))
+            with build_file.open('w') as f:
+                step.out_handle = f
+                yield step
+
+    def getTestSteps(self, test, lit_config, shared):
+        testSteps = super().getTestSteps(test, lit_config, shared)
+        test_base_name = test.getOutputBaseName() + '.test.cmd.'
+
+        for step, num in zip(testSteps, itertools.count()):
+            test_file = test.getOutputDir() / (test_base_name + str(num))
+            with test_file.open('w') as f:
+                step.out_handle = f
+                yield step
 
 
 class STLTestFormat:
@@ -39,10 +115,12 @@ class STLTestFormat:
     """
 
     def __init__(self, default_cxx, execute_external,
-                 build_executor, test_executor):
+                 build_executor, test_executor,
+                 step_provider=STLStepProvider()):
         self.cxx = default_cxx
         self.execute_external = execute_external
         self.build_executor = build_executor
+        self.step_provider = step_provider
         self.test_executor = test_executor
 
     def isLegalDirectory(self, source_path, litConfig):
@@ -124,8 +202,7 @@ class STLTestFormat:
                 os.link(path, exec_dir / path.name)
 
     def cleanup(self, test):
-        shutil.rmtree(test.getExecDir(), ignore_errors=True)
-        shutil.rmtree(test.getOutputDir(), ignore_errors=True)
+        pass
 
     def getIntegratedScriptResult(self, test, lit_config):
         if test.skipped:
@@ -184,40 +261,41 @@ class STLTestFormat:
         try:
             self.setup(test)
             pass_var, fail_var = test.getPassFailResultCodes()
-            buildSteps, testSteps = self.getSteps(test, lit_config)
+            buildSteps, testSteps = \
+                self.step_provider.getSteps(test, lit_config)
 
             report = ""
             for step in buildSteps:
-                cmd, out, err, rc = \
-                    self.build_executor.run(step.cmd, step.work_dir,
-                                            step.file_deps, step.env)
+                cmd, out, err, rc, force_pass = \
+                    self.build_executor.run(step)
 
-                if step.should_fail and rc == 0:
-                    report += "Build step succeeded unexpectedly.\n"
-                elif rc != 0:
-                    report += "Build step failed unexpectedly.\n"
+                if not force_pass:
+                    if step.should_fail and rc == 0:
+                        report += "Build step succeeded unexpectedly.\n"
+                    elif rc != 0:
+                        report += "Build step failed unexpectedly.\n"
 
-                report += stl.util.makeReport(cmd, out, err, rc)
-                if (step.should_fail and rc == 0) or \
-                        (not step.should_fail and rc != 0):
-                    lit_config.note(report)
-                    return lit.Test.Result(fail_var, report)
+                    report += stl.util.makeReport(cmd, out, err, rc)
+                    if (step.should_fail and rc == 0) or \
+                            (not step.should_fail and rc != 0):
+                        lit_config.note(report)
+                        return lit.Test.Result(fail_var, report)
 
             for step in testSteps:
-                cmd, out, err, rc = \
-                    self.test_executor.run(step.cmd, step.work_dir,
-                                           step.file_deps, step.env)
+                cmd, out, err, rc, force_pass = \
+                    self.test_executor.run(step)
 
-                if step.should_fail and rc == 0:
-                    report += "Test step succeeded unexpectedly.\n"
-                elif rc != 0:
-                    report += "Test step failed unexpectedly.\n"
+                if not force_pass:
+                    if step.should_fail and rc == 0:
+                        report += "Test step succeeded unexpectedly.\n"
+                    elif rc != 0:
+                        report += "Test step failed unexpectedly.\n"
 
-                report += stl.util.makeReport(cmd, out, err, rc)
-                if (step.should_fail and rc == 0) or \
-                        (not step.should_fail and rc != 0):
-                    lit_config.note(report)
-                    return lit.Test.Result(fail_var, report)
+                    report += stl.util.makeReport(cmd, out, err, rc)
+                    if (step.should_fail and rc == 0) or \
+                            (not step.should_fail and rc != 0):
+                        lit_config.note(report)
+                        return lit.Test.Result(fail_var, report)
 
             return lit.Test.Result(pass_var, report)
 
@@ -226,56 +304,6 @@ class STLTestFormat:
             raise e
         finally:
             self.cleanup(test)
-
-    def getSteps(self, test, lit_config):
-        @dataclass
-        class SharedState:
-            exec_file: Optional[os.PathLike] = field(default=None)
-            exec_dir: os.PathLike = field(default_factory=Path)
-
-        shared = SharedState()
-        return self.getBuildSteps(test, lit_config, shared), \
-            self.getTestSteps(test, lit_config, shared)
-
-    def getBuildSteps(self, test, lit_config, shared):
-        if not test.path_in_suite[-1].endswith('.fail.cpp'):
-            shared.exec_dir = test.getExecDir()
-            output_base = test.getOutputBaseName()
-            output_dir = test.getOutputDir()
-            source_path = Path(test.getSourcePath())
-
-            cmd, out_files, shared.exec_file = \
-                test.cxx.executeBasedOnFlagsCmd([source_path], output_dir,
-                                                shared.exec_dir, output_base,
-                                                [], [], [])
-
-            yield TestStep(cmd, shared.exec_dir, [source_path],
-                           test.cxx.compile_env)
-
-    def getTestSteps(self, test, lit_config, shared):
-        if shared.exec_file is not None:
-            exec_env = test.cxx.compile_env
-            exec_env['TMP'] = str(shared.exec_dir)
-
-            yield TestStep([str(shared.exec_file)], shared.exec_dir,
-                           [shared.exec_file], exec_env)
-        elif test.path_in_suite[-1].endswith('.fail.cpp'):
-            exec_dir = test.getExecDir()
-            source_path = Path(test.getSourcePath())
-
-            flags = []
-            if test.cxx.name == 'cl' and \
-                    ('/analyze' in test.cxx.flags or
-                     '/analyze' in test.cxx.compile_flags):
-                output_base = test.getOutputBaseName()
-                output_dir = test.getOutputDir()
-                analyze_path = output_dir / (output_base +
-                                             '.nativecodeanalysis.xml')
-                flags.append('/analyze:log' + str(analyze_path))
-
-            cmd, _ = test.cxx.compileCmd([source_path], os.devnull, flags)
-            yield TestStep(cmd, exec_dir, [source_path],
-                           test.cxx.compile_env, True)
 
 
 class LibcxxTestFormat(STLTestFormat):

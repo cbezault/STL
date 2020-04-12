@@ -11,7 +11,7 @@ import os
 import platform
 import shlex
 
-from stl.test.executor import LocalExecutor
+from stl.test.executor import ExternalExecutor
 from stl.compiler import CXXCompiler
 import stl.util
 import stl.test.file_parsing
@@ -41,6 +41,7 @@ class Configuration:
         self.link_shared = True
         self.long_tests = None
         self.msvc_toolset_libs_root = None
+        self.step_provider = None
         self.stl_build_root = None
         self.stl_inc_env_var = None
         self.stl_lib_env_var = None
@@ -93,6 +94,15 @@ class Configuration:
         self.configure_expected_results()
         self.configure_test_dirs()
         self.configure_test_format()
+        self.configure_step_provider()
+
+    def configure_step_provider(self):
+        step_provider = self.get_lit_conf('step_provider', None)
+
+        if step_provider is None:
+            step_provider = 'STLStepProvider'
+
+        self.step_provider = step_provider
 
     def configure_test_format(self):
         format_name = self.get_lit_conf('format_name', None)
@@ -350,8 +360,8 @@ class Configuration:
 
     # TRANSITION: Investigate using SSHExecutor for ARM
     def configure_executors(self):
-        self.build_executor = LocalExecutor()
-        self.test_executor = LocalExecutor()
+        self.build_executor = ExternalExecutor()
+        self.test_executor = ExternalExecutor()
 
     def configure_compile_flags(self):
         self.configure_compile_flags_header_includes()
@@ -424,7 +434,8 @@ class Configuration:
             self.default_compiler,
             self.execute_external,
             self.build_executor,
-            self.test_executor)
+            self.test_executor,
+            getattr(stl.test.format, self.step_provider)())
 
     # TRANSITION: Might be nice to actually print something
     def print_config_info(self):

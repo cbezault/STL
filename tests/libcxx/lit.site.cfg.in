@@ -15,6 +15,7 @@ config.format_name                 = "LibcxxTestFormat"
 config.include_dirs                = ["@LIBCXX_SOURCE_DIR@/test/support"]
 config.libcxx_obj_root             = "@LIBCXX_TEST_OUTPUT_DIR@"
 config.msvc_toolset_libs_root      = "@TOOLSET_LIB@"
+config.step_provider               = "STLDelayedExecutionStepProvider"
 config.stl_build_root              = "@STL_BUILD_ROOT@"
 config.stl_src_root                = "@STL_SOURCE_DIR@"
 config.target_arch                 = "@VCLIBS_TARGET_ARCHITECTURE@"
