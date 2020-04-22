@@ -439,7 +439,8 @@
     _Pragma("clang diagnostic ignored \"-Wc++17-extensions\"")      \
     _Pragma("clang diagnostic ignored \"-Wignored-attributes\"")    \
     _Pragma("clang diagnostic ignored \"-Wuser-defined-literals\"") \
-    _Pragma("clang diagnostic ignored \"-Wunknown-pragmas\"")
+    _Pragma("clang diagnostic ignored \"-Wunknown-pragmas\"")       \
+    _Pragma("clang diagnostic ignored \"-Wc++20-extensions\"")
 // clang-format on
 #else // __clang__
 #define _STL_DISABLE_CLANG_WARNINGS
