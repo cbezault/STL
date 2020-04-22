@@ -11,7 +11,7 @@ import os
 import platform
 import shlex
 
-from stl.test.executor import ExternalExecutor
+from stl.test.executor import BuildStepWriter, LocalTestStepWriter
 from stl.compiler import CXXCompiler
 import stl.util
 import stl.test.file_parsing
@@ -94,15 +94,6 @@ class Configuration:
         self.configure_expected_results()
         self.configure_test_dirs()
         self.configure_test_format()
-        self.configure_step_provider()
-
-    def configure_step_provider(self):
-        step_provider = self.get_lit_conf('step_provider', None)
-
-        if step_provider is None:
-            step_provider = 'STLStepProvider'
-
-        self.step_provider = step_provider
 
     def configure_test_format(self):
         format_name = self.get_lit_conf('format_name', None)
@@ -306,11 +297,6 @@ class Configuration:
         self.stl_path_env_var = stl_path_env_var
 
     def configure_test_env(self):
-        stl_test_env = self.get_lit_conf('stl_test_env', None)
-
-        if stl_test_env is None:
-            stl_test_env = self.config.environment
-
         if self.stl_lib_env_var is None:
             self.configure_inc_env_var()
 
@@ -320,8 +306,10 @@ class Configuration:
         if self.stl_path_env_var is None:
             self.configure_path_env_var()
 
+        stl_test_env = {}
         stl_test_env['INCLUDE'] = self.stl_inc_env_var
         stl_test_env['LIB'] = self.stl_lib_env_var
+        stl_test_env['LIBPATH'] = self.stl_lib_env_var
         stl_test_env['PATH'] = self.stl_path_env_var
 
         self.config.environment = stl_test_env
@@ -358,10 +346,9 @@ class Configuration:
 
         self.default_compiler.compile_env = self.config.environment
 
-    # TRANSITION: Investigate using SSHExecutor for ARM
     def configure_executors(self):
-        self.build_executor = ExternalExecutor()
-        self.test_executor = ExternalExecutor()
+        self.build_step_writer = BuildStepWriter()
+        self.test_step_writer = LocalTestStepWriter()
 
     def configure_compile_flags(self):
         self.configure_compile_flags_header_includes()
@@ -433,9 +420,9 @@ class Configuration:
         return getattr(stl.test.format, self.format_name)(
             self.default_compiler,
             self.execute_external,
-            self.build_executor,
-            self.test_executor,
-            getattr(stl.test.format, self.step_provider)())
+            self.build_step_writer,
+            self.test_step_writer,
+            stl.test.format.STLStepProvider())
 
     # TRANSITION: Might be nice to actually print something
     def print_config_info(self):

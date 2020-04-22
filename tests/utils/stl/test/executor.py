@@ -1,259 +1,109 @@
-#===----------------------------------------------------------------------===##
-#
-# Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
-# See https://llvm.org/LICENSE.txt for license information.
-# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-#
-#===----------------------------------------------------------------------===##
-
 from pathlib import Path
-import platform
 import os
-import posixpath
-import ntpath
-
-from stl.test import tracing
-from stl.util import executeCommand
 
 
-class Executor:
-    def __init__(self):
-        self.target_info = None
+class StepWriter:
+    def get_working_directory(step):
+        work_dir = Path()
+        if str(step.work_dir) == '.':
+            work_dir = Path(os.getcwd())
+        else:
+            work_dir = step.work_dir
 
-    def run(self, test_info):
-        """Execute a command.
-            Be very careful not to change shared state in this function.
-            Executor objects are shared between python processes in `lit -jN`.
-        Returns:
-            cmd, out, err, exitCode, delayedExecution
-        """
-        raise NotImplementedError
+        return work_dir
 
-    def merge_environments(self, current_env, updated_env):
-        """Merges two execution environments.
-
-        If both environments contain the PATH variables, they are also merged
-        using the proper separator.
-        """
+    def merge_environments(current_env, updated_env, appended_vars={'PATH'}):
         result_env = dict(current_env)
         for k, v in updated_env.items():
-            if k == 'PATH' and self.target_info:
-                self.target_info.add_path(result_env, v)
+            if k in appended_vars:
+                current_v = result_env.get(k)
+                if current_v:
+                    result_env[k] = v + ';' + current_v
+                else:
+                    result_env[k] = v
             else:
                 result_env[k] = v
         return result_env
 
-
-class ExternalExecutor(Executor):
-    def run(self, test_info):
-        work_dir = Path()
-        if str(test_info.work_dir) == '.':
-            work_dir = Path(os.getcwd())
-        else:
-            work_dir = test_info.work_dir
-
+    def write_step_file(self, step, step_file, test_file_handle):
         env = {}
-        if test_info.env:
-            env = self.merge_environments(os.environ, test_info.env)
+        if step.env:
+            env = StepWriter.merge_environments(os.environ, step.env)
 
-        out_cmd = 'cd "' + str(work_dir) + '"\n'
-
+        out_cmd = ''
         if env is not None:
             for k, v in env.items():
-                out_cmd += 'set ' + k + '="' + v + '"\n'
+                out_cmd += 'set ' + k + '=' + v + '\n'
 
-        out_cmd += ('\"%s\"\n' % '\" \"'.join(test_info.cmd))
-        print(out_cmd, file=test_info.out_handle)
+        out_cmd += ('\"%s\"\n' % '\" \"'.join(step.cmd))
 
-        return (test_info.cmd, '', '', 0, True)
+        with step_file.open('w') as f:
+            print(out_cmd, file=f)
+
+        global_prop_string = \
+            'set_property(GLOBAL APPEND PROPERTY STL_LIT_GENERATED_FILES {cmd})'
+        print(global_prop_string.format(cmd=step_file.as_posix()),
+              file=test_file_handle)
 
 
-class LocalExecutor(Executor):
-    def __init__(self):
-        super(LocalExecutor, self).__init__()
-        self.is_windows = platform.system() == 'Windows'
+class BuildStepWriter(StepWriter):
+    def write(self, test, step, test_file_handle):
+        build_base_name = test.getOutputBaseName() + '.build.{}.cmd'
+        step_file = \
+            test.getOutputDir() / build_base_name.format(str(step.num))
+        self.write_step_file(step, step_file, test_file_handle)
 
-    def run(self, test_info):
-        work_dir = Path()
-        if str(test_info.work_dir) == '.':
-            work_dir = Path(os.getcwd())
+        work_dir = StepWriter.get_working_directory(step)
+
+        pass_string = \
+            'add_custom_command(OUTPUT {out} COMMAND cmd ARGS /c {cmd} DEPENDS msvcpd_implib msvcp_implib libcpmt libcpmt1 libcpmtd libcpmtd1 libcpmtd0 {cmd} {deps} WORKING_DIRECTORY {cwd})\nadd_custom_target({name} ALL DEPENDS {out})'
+        fail_string = \
+            'add_test(NAME {name} COMMAND cmd /c {cmd} WORKING_DIRECTORY {cwd})\nset_property(TEST {name} PROPERTY WILL_FAIL TRUE)'
+
+        if not step.should_fail:
+            name = test.getFullName() + '_' + str(step.num)
+            print(pass_string.format(out=' '.join(map(lambda dep: dep.as_posix(), step.out_files)),
+                                     cmd=step_file.as_posix(),
+                                     deps=' '.join(map(lambda dep: dep.as_posix(), step.dependencies)),
+                                     cwd=work_dir.as_posix(),
+                                     name=name),
+                  file=test_file_handle)
         else:
-            work_dir = test_info.work_dir
-
-        env = {}
-        if test_info.env:
-            env = self.merge_environments(os.environ, test_info.env)
-
-        out, err, rc = executeCommand(test_info.cmd, cwd=work_dir, env=env)
-        return (test_info.cmd, out, err, rc, False)
+            print(fail_string.format(test.getFullName(),
+                                     cmd=step_file.as_posix(),
+                                     cwd=work_dir.as_posix()),
+                  file=test_file_handle)
 
 
-class PrefixExecutor(Executor):
-    """Prefix an executor with some other command wrapper.
+class LocalTestStepWriter(StepWriter):
+    def write(self, test, step, test_file_handle):
+        test_base_name = test.getOutputBaseName() + '.test.{}.cmd'
+        step_file = \
+            test.getOutputDir() / test_base_name.format(str(step.num))
+        self.write_step_file(step, step_file, test_file_handle)
 
-    Most useful for setting ulimits on commands, or running an emulator like
-    qemu and valgrind.
-    """
-    def __init__(self, commandPrefix, chain):
-        super(PrefixExecutor, self).__init__()
+        work_dir = StepWriter.get_working_directory(step)
 
-        self.commandPrefix = commandPrefix
-        self.chain = chain
+        test_string = \
+            'add_test(NAME {name} COMMAND cmd /c {cmd} WORKING_DIRECTORY {cwd})'
+        fail_string = \
+            'set_property(TEST {name} PROPERTY WILL_FAIL TRUE)'
+        depends_string = \
+            'set_property(TEST {name} PROPERTY DEPENDS {prev_test})'
 
-    def run(self, exe_path, cmd=None, work_dir='.', file_deps=None, env=None):
-        cmd = cmd or [exe_path]
-        return self.chain.run(exe_path, self.commandPrefix + cmd, work_dir,
-                              file_deps, env=env)
+        test_name = '"' + test.getFullName() + '_' + str(step.num) + '"'
+        print(test_string.format(name=test_name,
+                                 cmd=step_file.as_posix(),
+                                 cwd=work_dir.as_posix()),
+              file=test_file_handle)
 
+        if step.should_fail:
+            print(fail_string.format(name=test_name),
+                  file=test_file_handle)
 
-class PostfixExecutor(Executor):
-    """Postfix an executor with some args."""
-    def __init__(self, commandPostfix, chain):
-        super(PostfixExecutor, self).__init__()
-
-        self.commandPostfix = commandPostfix
-        self.chain = chain
-
-    def run(self, exe_path, cmd=None, work_dir='.', file_deps=None, env=None):
-        cmd = cmd or [exe_path]
-        return self.chain.run(cmd + self.commandPostfix, work_dir, file_deps,
-                              env=env)
-
-
-class RemoteExecutor(Executor):
-    def __init__(self):
-        super(RemoteExecutor, self).__init__()
-        self.local_run = executeCommand
-
-    def remote_temp_dir(self):
-        return self._remote_temp(True)
-
-    def remote_temp_file(self):
-        return self._remote_temp(False)
-
-    def _remote_temp(self, is_dir):
-        raise NotImplementedError()
-
-    def copy_in(self, local_srcs, remote_dsts):
-        # This could be wrapped up in a tar->scp->untar for performance
-        # if there are lots of files to be copied/moved
-        for src, dst in zip(local_srcs, remote_dsts):
-            self._copy_in_file(src, dst)
-
-    def _copy_in_file(self, src, dst):
-        raise NotImplementedError()
-
-    def delete_remote(self, remote):
-        try:
-            self._execute_command_remote(['rm', '-rf', remote])
-        except OSError:
-            # TRANSITION: Log failure to delete?
-            pass
-
-    def run(self, exe_path, cmd=None, work_dir='.', file_deps=None, env=None):
-        target_exe_path = None
-        target_cwd = None
-        try:
-            target_cwd = self.remote_temp_dir()
-            executable_name = 'libcxx_test.exe'
-            if self.target_info.is_windows():
-                target_exe_path = ntpath.join(target_cwd, executable_name)
-            else:
-                target_exe_path = posixpath.join(target_cwd, executable_name)
-
-            if cmd:
-                # Replace exe_path with target_exe_path.
-                cmd = [c if c != exe_path else target_exe_path for c in cmd]
-            else:
-                cmd = [target_exe_path]
-
-            srcs = [exe_path]
-            dsts = [target_exe_path]
-            if file_deps is not None:
-                dev_paths = [os.path.join(target_cwd, os.path.basename(f))
-                             for f in file_deps]
-                srcs.extend(file_deps)
-                dsts.extend(dev_paths)
-            self.copy_in(srcs, dsts)
-
-            # When testing executables that were cross-compiled on Windows for
-            # Linux, we may need to explicitly set the execution permission to
-            # avoid the 'Permission denied' error:
-            chmod_cmd = ['chmod', '+x', target_exe_path]
-
-            return self._execute_command_remote(chmod_cmd + ['&&'] + cmd,
-                                                target_cwd,
-                                                env)
-        finally:
-            if target_cwd:
-                self.delete_remote(target_cwd)
-
-    def _execute_command_remote(self, cmd, remote_work_dir='.', env=None):
-        raise NotImplementedError()
-
-
-class SSHExecutor(RemoteExecutor):
-    def __init__(self, host, username=None):
-        super(SSHExecutor, self).__init__()
-
-        self.user_prefix = username + '@' if username else ''
-        self.host = host
-        self.scp_command = 'scp'
-        self.ssh_command = 'ssh'
-
-        if False:
-            self.local_run = tracing.trace_function(
-                self.local_run, log_calls=True, log_results=True,
-                label='ssh_local')
-
-    def _remote_temp(self, is_dir):
-        # TRANSITION: detect what the target system is, and use the correct
-        # mktemp command for it. (linux and darwin differ here, and I'm
-        # sure windows has another way to do it)
-
-        # Not sure how to do suffix on osx yet
-        dir_arg = '-d' if is_dir else ''
-        cmd = 'mktemp -q {} /tmp/stl.XXXXXXXXXX'.format(dir_arg)
-        _, temp_path, err, exitCode = self._execute_command_remote([cmd])
-        temp_path = temp_path.strip()
-        if exitCode != 0:
-            raise RuntimeError(err)
-        return temp_path
-
-    def _copy_in_file(self, src, dst):
-        scp = self.scp_command
-        remote = self.host
-        remote = self.user_prefix + remote
-        cmd = [scp, '-p', src, remote + ':' + dst]
-        self.local_run(cmd)
-
-    def _export_command(self, env):
-        if not env:
-            return []
-
-        export_cmd = ['export']
-
-        for k, v in env.items():
-            v = v.replace('\\', '\\\\')
-            if k == 'PATH':
-                # Pick up the existing paths, so we don't lose any commands
-                if self.target_info and self.target_info.is_windows():
-                    export_cmd.append('PATH="%s;%PATH%"' % v)
-                else:
-                    export_cmd.append('PATH="%s:$PATH"' % v)
-            else:
-                export_cmd.append('"%s"="%s"' % (k, v))
-
-        return export_cmd
-
-    def _execute_command_remote(self, cmd, remote_work_dir='.', env=None):
-        remote = self.user_prefix + self.host
-        ssh_cmd = [self.ssh_command, '-oBatchMode=yes', remote]
-        export_cmd = self._export_command(env)
-        remote_cmd = ' '.join(cmd)
-        if export_cmd:
-            remote_cmd = ' '.join(export_cmd) + ' && ' + remote_cmd
-        if remote_work_dir != '.':
-            remote_cmd = 'cd ' + remote_work_dir + ' && ' + remote_cmd
-        out, err, rc = self.local_run(ssh_cmd + [remote_cmd])
-        return (remote_cmd, out, err, rc)
+        if step.num != 0:
+            prev_test = \
+                '"' + test.getFullName() + '_' + str(step.num - 1) + '"'
+            print(depends_string.format(name=test_name,
+                                        prev_test=prev_test),
+                  file=test_file_handle)

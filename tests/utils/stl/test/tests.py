@@ -9,15 +9,27 @@
 
 from itertools import chain
 from pathlib import Path
-from xml.sax.saxutils import quoteattr
+import enum
 import os
 import shutil
 
-from lit.Test import FAIL, PASS, SKIPPED, Test, UNSUPPORTED, XPASS, XFAIL
+from lit.Test import Test
 
 from stl.compiler import CXXCompiler
 
 _compiler_path_cache = dict()
+
+
+class TestType(enum.Enum):
+    COMPILE_PASS = enum.auto()
+    LINK_PASS = enum.auto()
+    RUN_PASS = enum.auto()
+
+    COMPILE_FAIL = enum.auto()
+    LINK_FAIL = enum.auto()
+    RUN_FAIL = enum.auto()
+
+    SKIPPED = enum.auto()
 
 
 class STLTest(Test):
@@ -27,9 +39,9 @@ class STLTest(Test):
         self.skipped = False
         Test.__init__(self, suite, path_in_suite, test_config, file_path)
 
-        self._configure_expected_result(suite, path_in_suite, lit_config,
-                                        test_config, env_num)
-        if self.skipped:
+        self._configure_test_type(suite, path_in_suite, lit_config,
+                                  test_config, env_num)
+        if self.test_type is TestType.SKIPPED:
             return
 
         self._configure_cxx(lit_config, envlst_entry, default_cxx)
@@ -54,35 +66,19 @@ class STLTest(Test):
     def getExecPath(self):
         return self.getExecDir() / (self.getOutputBaseName() + '.exe')
 
+    def getTestFilePath(self):
+        return self.getOutputDir() / 'test.cmake'
+
     def getTestName(self):
-        return '/'.join(self.path_in_suite[:-1]) + ":" + self.env_num
+        return '-'.join(self.path_in_suite[:-1]) + "--" + self.env_num
 
     def getFullName(self):
-        return self.suite.config.name + ' :: ' + self.getTestName()
+        return self.suite.config.name + '--' + self.getTestName()
 
-    def getPassFailResultCodes(self):
-        should_fail = self.isExpectedToFail()
-        pass_var = XPASS if should_fail else PASS
-        fail_var = XFAIL if should_fail else FAIL
-
-        return pass_var, fail_var
-
-    def getXMLOutputTestName(self):
-        return ':'.join((self.path_in_suite[-2], self.env_num))
-
-    def getXMLOutputClassName(self):
-        safe_test_path = [x.replace(".", "_") for x in self.path_in_suite[:-1]]
-        safe_suite_name = self.suite.name.replace(".", "-")
-
-        if safe_test_path:
-            return safe_suite_name + "." + "/".join(safe_test_path)
-        else:
-            return safe_suite_name + "." + safe_suite_name
-
-    def _configure_expected_result(self, suite, path_in_suite, lit_config,
-                                   test_config, env_num):
+    def _configure_test_type(self, suite, path_in_suite, lit_config,
+                             test_config, env_num):
         test_name = self.getTestName()
-        self.expected_result = None
+        self.test_type = None
 
         current_prefix = ""
         for prefix, result in \
@@ -90,23 +86,37 @@ class STLTest(Test):
                       lit_config.expected_results.get(test_config.name,
                                                       dict()).items()):
             if test_name == prefix:
-                self.expected_result = result
-                break
+                self.test_type = result
+                return
             elif test_name.startswith(prefix) and \
                     len(prefix) > len(current_prefix):
                 current_prefix = prefix
-                self.expected_result = result
+                self.test_type = result
 
-        if test_name in test_config.expected_results:
-            self.expected_result = test_config.expected_results[test_name]
-        elif test_name in lit_config.expected_results:
-            self.expected_result = lit_config.expected_results[test_name]
+        if self.test_type is not None:
+            return
 
-        if self.expected_result is not None:
-            if self.expected_result == SKIPPED:
-                self.skipped = True
-            elif self.expected_result.isFailure:
-                self.xfails = ['*']
+        filename = path_in_suite[-1]
+        if filename.endswith('.compile.pass.cpp'):
+            self.test_type = TestType.COMPILE_PASS
+        elif filename.endswith('.link.pass.cpp'):
+            self.test_type = TestType.LINK_PASS
+        elif filename.endswith('.pass.cpp'):
+            self.test_type = TestType.RUN_PASS
+        elif filename.endswith('.compile.fail.cpp'):
+            self.test_type = TestType.COMPILE_FAIL
+        elif filename.endswith('.link.fail.cpp'):
+            self.test_type = TestType.LINK_FAIL
+        elif filename.endswith('.run.fail.cpp'):
+            self.test_type = TestType.RUN_FAIL
+        elif filename.endswith('.fail.cpp'):
+            self.test_type = TestType.COMPILE_FAIL
+        else:
+            self.test_type = TestType.RUN_PASS
+
+    def shouldBuild(self):
+        return self.test_type in (TestType.COMPILE_PASS, TestType.LINK_PASS,
+                                  TestType.RUN_PASS, TestType.RUN_FAIL)
 
     def _configure_cxx(self, lit_config, envlst_entry, default_cxx):
         env_compiler = envlst_entry.getEnvVal('PM_COMPILER', 'cl')
@@ -143,52 +153,6 @@ class STLTest(Test):
         self.cxx = CXXCompiler(cxx, flags, compile_flags, link_flags,
                                default_cxx.compile_env)
 
-    # This is partially lifted from lit's Test class. The changes here are to
-    # handle skipped tests, our env.lst format, and different naming schemes.
-    def writeJUnitXML(self, fil):
-        """Write the test's report xml representation to a file handle."""
-        test_name = quoteattr(self.getXMLOutputTestName())
-        class_name = quoteattr(self.getXMLOutputClassName())
-
-        testcase_template = \
-            '<testcase classname={class_name} name={test_name} ' \
-            'time="{time:.2f}"'
-        elapsed_time = self.result.elapsed if self.result.elapsed else 0.0
-        testcase_xml = \
-            testcase_template.format(class_name=class_name,
-                                     test_name=test_name,
-                                     time=elapsed_time)
-        fil.write(testcase_xml)
-
-        if self.result.code.isFailure:
-            fil.write(">\n\t<failure><![CDATA[")
-            if isinstance(self.result.output, str):
-                encoded_output = self.result.output
-            elif isinstance(self.result.output, bytes):
-                encoded_output = self.result.output.decode("utf-8", 'replace')
-            # In the unlikely case that the output contains the CDATA
-            # terminator we wrap it by creating a new CDATA block
-            fil.write(encoded_output.replace("]]>", "]]]]><![CDATA[>"))
-            fil.write("]]></failure>\n</testcase>")
-        elif self.result.code == UNSUPPORTED:
-            unsupported_features = self.getMissingRequiredFeatures()
-            if unsupported_features:
-                skip_message = \
-                    "Skipping because of: " + ", ".join(unsupported_features)
-            else:
-                skip_message = "Skipping because of configuration."
-            skip_message = quoteattr(skip_message)
-
-            fil.write(
-                ">\n\t<skipped message={} />\n</testcase>".format(
-                    skip_message))
-        elif self.result.code == SKIPPED:
-            message = quoteattr('Test is explicitly marked as skipped')
-            fil.write(">\n\t<skipped message={} />\n</testcase>".format(
-                message))
-        else:
-            fil.write("/>")
-
 
 class LibcxxTest(STLTest):
     def getOutputBaseName(self):
@@ -207,9 +171,3 @@ class LibcxxTest(STLTest):
         return Path(os.path.join(
             self.suite.getExecPath(self.path_in_suite[:-1]))) / dir_name / \
             self.env_num
-
-    def getXMLOutputTestName(self):
-        return ':'.join((self.path_in_suite[-1], self.env_num))
-
-    def getTestName(self):
-        return '/'.join(self.path_in_suite) + ':' + self.env_num
