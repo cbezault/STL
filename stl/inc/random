@@ -591,7 +591,7 @@ private:
 // CLASS TEMPLATE _Circ_buf FOR subtract_with_carry, subtract_with_carry_01, AND mersenne_twister
 template <class _Ty, size_t _Nw>
 struct _Circ_buf { // holds historical values for generators
-    _Ty _At(int _Ix) const {
+    _Ty _At(size_t _Ix) const {
         return _Ax[_Base(_Ix)];
     }
 
@@ -637,7 +637,7 @@ struct _Circ_buf { // holds historical values for generators
         return true;
     }
 
-    unsigned int _Base(int _Ix = 0) const {
+    size_t _Base(size_t _Ix = 0) const {
         return (_Ix += _Idx) < _Nw ? (_Ix + _Nw) : (_Ix - _Nw);
     }
 
@@ -827,7 +827,7 @@ struct _Swc_traits { // traits for subtract_with_carry generator
                                                              // otherwise compute from last value
         int _Kx = _Get_wc();
 
-        for (int _Ix = 0; _Ix < _Nw; ++_Ix) { // pack _Kx words
+        for (size_t _Ix = 0; _Ix < _Nw; ++_Ix) { // pack _Kx words
             _Ax[_Ix] = _Gx();
             for (int _Jx = 1; _Jx < _Kx; ++_Jx) {
                 _Ax[_Ix] |= static_cast<_Ty>(_Gx()) << (32 * _Jx);
@@ -846,7 +846,7 @@ struct _Swc_traits { // traits for subtract_with_carry generator
 #pragma warning(disable : 4724) // potential mod by 0
     static _Cy_t _Reduce(_Ty* _Ax) { // reduce values to allowed range
         if _CONSTEXPR_IF (_Mx != 0) {
-            for (int _Ix = 0; _Ix < _Nw; ++_Ix) {
+            for (size_t _Ix = 0; _Ix < _Nw; ++_Ix) {
                 _Ax[_Ix] = _Ax[_Ix] % _Mx;
             }
         }
@@ -860,7 +860,7 @@ struct _Swc_traits { // traits for subtract_with_carry generator
         basic_ostream<_Elem, _Traits>& _Ostr, const _Circ_buf<_Ty, _Nw>& _Buf, _Cy_t _Cy) { // write state to _Ostr
         int _Kx = _Get_wc();
 
-        for (int _Ix = 0; _Ix < _Nw; ++_Ix) {
+        for (size_t _Ix = 0; _Ix < _Nw; ++_Ix) {
             for (int _Jx = 1; _Jx <= _Kx; ++_Jx) { // unpack into _Kx words
                 unsigned int _Word = static_cast<unsigned int>(_Buf._At(_Ix) >> ((_Kx - _Jx) * 32));
                 _Ostr << _Word << ' ';
