@@ -975,7 +975,7 @@ struct _Swc_01_traits { // traits for subtract_with_carry_01 generator
     static _Cy_t _Reset(_Gen& _Gx, _Ty* _Ax, bool _Readcy) { // set initial values of _Ax from generator _Gx
                                                              // return value of _Cy from range if _Readcy is true,
                                                              // otherwise from last value
-        for (int _Ix = 0; _Ix < _Rx; ++_Ix) { // read values
+        for (size_t _Ix = 0; _Ix < _Rx; ++_Ix) { // read values
             _Ty _Factor = 1;
             _Ty _Val    = 0;
             for (int _Jx = 0; _Jx < _Nwords - 1; ++_Jx) { // read components of value
