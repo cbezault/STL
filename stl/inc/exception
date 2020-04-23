@@ -171,7 +171,8 @@ inline terminate_handler __CRTDECL set_terminate(terminate_handler) noexcept { /
     return nullptr;
 }
 
-inline void __CRTDECL terminate() noexcept { // handle exception termination
+[[noreturn]] inline void __CRTDECL terminate() noexcept { // handle exception termination
+    _CSTD abort();
 }
 
 _NODISCARD inline terminate_handler __CRTDECL get_terminate() noexcept { // get current terminate handler
