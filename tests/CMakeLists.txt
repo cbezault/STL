@@ -30,11 +30,11 @@ execute_process(
     COMMAND ${Python3_EXECUTABLE}
             ${STL_LIT}
             #"${LIBCXX_SOURCE_DIR}/test/std"
-            #"${CMAKE_CURRENT_SOURCE_DIR}/std"
+            "${CMAKE_CURRENT_SOURCE_DIR}/std"
             "${CMAKE_CURRENT_SOURCE_DIR}/tr1")
 
-        #include("${CMAKE_CURRENT_BINARY_DIR}/libcxx/tests.cmake")
-        #include("${CMAKE_CURRENT_BINARY_DIR}/std/tests.cmake")
+#include("${CMAKE_CURRENT_BINARY_DIR}/libcxx/tests.cmake")
+include("${CMAKE_CURRENT_BINARY_DIR}/std/tests.cmake")
 include("${CMAKE_CURRENT_BINARY_DIR}/tr1/tests.cmake")
 
 get_property(STL_LIT_GENERATED_FILES GLOBAL PROPERTY STL_LIT_GENERATED_FILES)

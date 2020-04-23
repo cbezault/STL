@@ -59,9 +59,10 @@ class STLStepProvider:
                                             shared.exec_dir, output_base,
                                             [], [], [])
 
-        yield TestStep(cmd=cmd, env=shared.exec_env, out_files=out_files,
+        yield TestStep(cmd=cmd, dependencies=[source_path],
+                       env=shared.exec_env, out_files=out_files,
                        should_fail=not test.shouldBuild(),
-                       dependencies=[source_path], work_dir=shared.exec_dir)
+                       work_dir=shared.exec_dir)
 
     def getTestSteps(self, test, lit_config, shared):
         if shared.exec_file is None:
