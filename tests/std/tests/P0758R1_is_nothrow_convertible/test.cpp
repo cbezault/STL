@@ -42,11 +42,6 @@ struct ConvertibleToAnything {
 
 struct Tiger : Cat {};
 
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-volatile"
-#endif
-
 STATIC_ASSERT(!is_nothrow_convertible<Cat, ExplicitlyConvertibleFromCat>::value);
 STATIC_ASSERT(!is_nothrow_convertible_v<Cat, ExplicitlyConvertibleFromCat>);
 STATIC_ASSERT(!is_nothrow_convertible<Cat, ImplicitlyConvertibleFromCat>::value);
@@ -111,10 +106,6 @@ STATIC_ASSERT(is_nothrow_convertible_v<int[], int*>);
 STATIC_ASSERT(is_nothrow_convertible_v<int[1], int*>);
 STATIC_ASSERT(!is_nothrow_convertible_v<int[], int[]>);
 STATIC_ASSERT(!is_nothrow_convertible_v<int[], int[1]>);
-
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif
 
 // VSO_0105317_expression_sfinae and VSO_0000000_type_traits provide
 // additional coverage of this machinery
