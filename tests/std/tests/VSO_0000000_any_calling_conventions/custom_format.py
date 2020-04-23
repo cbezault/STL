@@ -53,4 +53,4 @@ class CustomTestFormat(STLTestFormat):
                        dependencies=[a_output, exe_source],
                        env=shared.exec_env,
                        out_files=out_files,
-                       work_dir=shared.exec_dir)
+                       work_dir=shared.exec_dir, num=1)
