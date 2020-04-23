@@ -41,7 +41,6 @@ class Configuration:
         self.link_shared = True
         self.long_tests = None
         self.msvc_toolset_libs_root = None
-        self.step_provider = None
         self.stl_build_root = None
         self.stl_inc_env_var = None
         self.stl_lib_env_var = None
@@ -421,8 +420,7 @@ class Configuration:
             self.default_compiler,
             self.execute_external,
             self.build_step_writer,
-            self.test_step_writer,
-            stl.test.format.STLStepProvider())
+            self.test_step_writer)
 
     # TRANSITION: Might be nice to actually print something
     def print_config_info(self):

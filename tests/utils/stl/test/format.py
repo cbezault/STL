@@ -33,7 +33,21 @@ class TestStep:
     work_dir: os.PathLike = field(default=Path('.'))
 
 
-class STLStepProvider:
+_test_suite_file_handles = {}
+
+
+class STLTestFormat:
+    """
+    Custom test format handler to run MSVC tests.
+    """
+
+    def __init__(self, default_cxx, execute_external,
+                 build_step_writer, test_step_writer):
+        self.cxx = default_cxx
+        self.execute_external = execute_external
+        self.build_step_writer = build_step_writer
+        self.test_step_writer = test_step_writer
+
     def getSteps(self, test, lit_config):
         class SharedState:
             def __init__(self, test):
@@ -74,24 +88,6 @@ class STLStepProvider:
                            env=shared.exec_env,
                            should_fail=test.test_type is TestType.RUN_FAIL,
                            work_dir=shared.exec_dir)
-
-
-_test_suite_file_handles = {}
-
-
-class STLTestFormat:
-    """
-    Custom test format handler to run MSVC tests.
-    """
-
-    def __init__(self, default_cxx, execute_external,
-                 build_step_writer, test_step_writer,
-                 step_provider=STLStepProvider()):
-        self.cxx = default_cxx
-        self.execute_external = execute_external
-        self.build_step_writer = build_step_writer
-        self.step_provider = step_provider
-        self.test_step_writer = test_step_writer
 
     def isLegalDirectory(self, source_path, litConfig):
         found = False
@@ -228,7 +224,7 @@ class STLTestFormat:
             return test.script_result
 
         self.setup(test)
-        buildSteps, testSteps = self.step_provider.getSteps(test, lit_config)
+        buildSteps, testSteps = self.getSteps(test, lit_config)
 
         test_file = test.getTestFilePath()
 
