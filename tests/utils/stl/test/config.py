@@ -34,8 +34,8 @@ class Configuration:
         self.cxx_runtime_root = None
         self.default_compiler = None
         self.execute_external = False
-        self.expected_results_list_path = None
-        self.expected_results_list_root = None
+        self.test_type_override_path = None
+        self.test_type_override_root = None
         self.format_name = None
         self.lit_config = lit_config
         self.link_shared = True
@@ -89,7 +89,7 @@ class Configuration:
         self.configure_features()
         self.configure_default_compiler()
         self.configure_executors()
-        self.configure_expected_results()
+        self.configure_test_type_overrides()
         self.configure_test_dirs()
         self.configure_test_format()
 
@@ -267,29 +267,30 @@ class Configuration:
 
         self.config.environment = stl_test_env
 
-    def configure_expected_results_list_location(self):
-        expected_results_list_path = self.get_lit_conf(
-            'expected_results_list_path', None)
+    def configure_test_type_overrides_location(self):
+        test_type_overrides_list_path = self.get_lit_conf(
+            'test_type_overrides_path', None)
 
-        if expected_results_list_path is not None:
-            self.expected_results_list_path = Path(
-                expected_results_list_path)
+        if test_type_overrides_list_path is not None:
+            self.test_type_overrides_list_path = Path(
+                test_type_overrides_list_path)
         else:
-            self.expected_results_list_path = Path(os.devnull)
+            self.test_type_overrides_list_path = Path(os.devnull)
 
-    def configure_expected_results(self):
-        expected_results = getattr(self.lit_config, 'expected_results', dict())
+    def configure_test_type_overrides(self):
+        test_type_overrides = getattr(self.lit_config, 'test_type_overrides',
+                                      dict())
 
-        if self.expected_results_list_path is None:
-            self.configure_expected_results_list_location()
+        if self.test_type_overrides_list_path is None:
+            self.configure_test_type_overrides_list_location()
 
-        expected_results[self.config.name] = \
-            stl.test.file_parsing.parse_result_file(
-                self.expected_results_list_path)
+        test_type_overrides[self.config.name] = \
+            stl.test.file_parsing.parse_test_type_file(
+                self.test_type_overrides_list_path)
 
-        self.lit_config.expected_results = expected_results
-        self.config.expected_results = \
-            getattr(self.config, 'expected_results', dict())
+        self.lit_config.test_type_overrides = test_type_overrides
+        self.config.test_type_overrides = \
+            getattr(self.config, 'test_type_overrides', dict())
 
     def configure_default_compiler(self):
         self.default_compiler = CXXCompiler(None)

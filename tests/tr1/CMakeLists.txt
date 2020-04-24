@@ -1,9 +1,9 @@
 # Copyright (c) Microsoft Corporation.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-set(TR1_EXPECTED_RESULTS "${CMAKE_CURRENT_SOURCE_DIR}/expected_results.txt")
 set(TR1_TEST_OUTPUT_DIR "${STL_TEST_OUTPUT_DIR}/tr1")
 set(TR1_TEST_SUBDIRS_FILE "${CMAKE_CURRENT_SOURCE_DIR}/test.lst")
+set(TR1_TEST_TYPE_OVERRIDES "${CMAKE_CURRENT_SOURCE_DIR}/test_type_overrides.txt")
 set(TR1_TEST_SUBDIRS_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
 
 configure_file(

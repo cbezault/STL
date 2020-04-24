@@ -29,11 +29,11 @@ find_package(Python3)
 execute_process(
     COMMAND ${Python3_EXECUTABLE}
             ${STL_LIT}
-            #"${LIBCXX_SOURCE_DIR}/test/std"
+            "${LIBCXX_SOURCE_DIR}/test/std"
             "${CMAKE_CURRENT_SOURCE_DIR}/std"
             "${CMAKE_CURRENT_SOURCE_DIR}/tr1")
 
-#include("${CMAKE_CURRENT_BINARY_DIR}/libcxx/tests.cmake")
+include("${CMAKE_CURRENT_BINARY_DIR}/libcxx/tests.cmake")
 include("${CMAKE_CURRENT_BINARY_DIR}/std/tests.cmake")
 include("${CMAKE_CURRENT_BINARY_DIR}/tr1/tests.cmake")
 
