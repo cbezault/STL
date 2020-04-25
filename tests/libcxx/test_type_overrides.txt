@@ -955,7 +955,7 @@ std/localization/locales/locale.convenience/conversions/conversions.string/ctor_
 
 # Not yet analyzed, likely STL bugs. Various assertions.
 std/input.output/iostream.format/ext.manip/get_money.pass.cpp RUN_FAIL
-std/input.output/iostream.format/ext.manip/put_money.pass.cpp RUN_FAIL
+std/input.output/iostream.format/ext.manip/put_money.pass.cpp COMPILE_FAIL
 std/input.output/iostreams.base/ios/basic.ios.members/copyfmt.pass.cpp RUN_FAIL
 
 # Not yet analyzed, likely STL bugs. Assertion failed: os.str() == a
