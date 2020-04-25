@@ -587,7 +587,7 @@ std/strings/string.view/char.bad.fail.cpp:0 COMPILE_FAIL
 
 # Predicate count assertions - IDL2 is slightly bending the Standard's rules here.
 std/algorithms/alg.sorting/alg.heap.operations/make.heap/make_heap_comp.pass.cpp RUN_FAIL
-std/algorithms/alg.sorting/alg.merge/inplace_merge_comp.pass.cpp RUN_FAIL
+std/algorithms/alg.sorting/alg.merge/inplace_merge_comp.pass.cpp COMPILE_FAIL
 std/algorithms/alg.sorting/alg.min.max/minmax_init_list_comp.pass.cpp RUN_FAIL
 
 # STL bug: We don't match strtod / strtof when doing field extraction for hexfloats, or special cases like inf
