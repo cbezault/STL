@@ -40,7 +40,7 @@ class BuildStepWriter:
         fail_string = \
             'add_test(NAME {name} COMMAND {cmd} WORKING_DIRECTORY "{cwd}")\nset_property(TEST {name} PROPERTY WILL_FAIL TRUE)'
         env_prop = \
-            'set_property(TEST {name} PROPERTY ENVIRONMENT APPEND {env})'
+            'set_property(TEST {name} PROPERTY ENVIRONMENT {env})'
 
         if not step.should_fail:
             name = test.getFullName() + '_' + str(step.num)
@@ -62,7 +62,9 @@ class BuildStepWriter:
                 for k, v in step.env.items():
                     env_list.append(k + '=' + v)
                 cmake_env_list = \
-                    '"' + '" "'.join(env_list).replace('\\', '/') + '"'
+                    '"' + \
+                    '" "'.join(env_list).replace('\\', '/').replace(';', '\\;') + \
+                    '"'
 
                 print(env_prop.format(name=test.getFullName(),
                                       env=cmake_env_list),
@@ -95,7 +97,9 @@ class LocalTestStepWriter:
             for k, v in step.env.items():
                 env_list.append(k + '=' + v)
             cmake_env_list = \
-                '\"' + '\" \"'.join(env_list).replace('\\', '/') + '\"'
+                '"' + \
+                '" "'.join(env_list).replace('\\', '/').replace(';', '\\;') + \
+                '"'
 
             print(env_prop.format(name=test_name, env=cmake_env_list),
                   file=test_file_handle)

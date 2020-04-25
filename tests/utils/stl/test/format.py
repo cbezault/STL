@@ -158,9 +158,6 @@ class STLTestFormat:
                                           format_string.format(env_num),
                                           self.cxx)
 
-                        test.script_result = \
-                            self.getIntegratedScriptResult(test, litConfig)
-
                         if test.script_result is None:
                             test_file = test.getTestFilePath().as_posix()
                             out_string = global_prop_string.format(test_file)
@@ -186,38 +183,6 @@ class STLTestFormat:
         for path in source_dir.iterdir():
             if path.is_file() and path.name.endswith('.dat'):
                 shutil.copy2(path, exec_dir / path.name)
-
-    def getIntegratedScriptResult(self, test, lit_config):
-        if test.test_type is TestType.SKIPPED:
-            return (lit.Test.SKIPPED, "Test was marked as skipped")
-
-        name = test.path_in_suite[-1]
-        name_root, name_ext = os.path.splitext(name)
-        is_sh_test = name_root.endswith('.sh')
-        is_objcxx_test = name.endswith('.mm')
-
-        if is_sh_test:
-            return (lit.Test.UNSUPPORTED,
-                    "Sh tests are currently unsupported")
-
-        if is_objcxx_test:
-            return (lit.Test.UNSUPPORTED,
-                    "Objective-C tests are unsupported")
-
-        if test.config.unsupported:
-            return (lit.Test.UNSUPPORTED,
-                    "A lit.local.cfg marked this unsupported")
-
-        if lit_config.noExecute:
-            return lit.Test.Result(lit.Test.PASS)
-
-        script = lit.TestRunner.parseIntegratedTestScript(
-            test, require_script=False)
-
-        if isinstance(script, lit.Test.Result):
-            return script
-
-        return None
 
     def execute(self, test, lit_config):
         if test.script_result is not None:

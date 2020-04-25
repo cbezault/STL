@@ -9,6 +9,7 @@
 from pathlib import Path
 import os
 import platform
+import re
 import shlex
 
 from stl.test.executor import BuildStepWriter, LocalTestStepWriter
@@ -34,8 +35,6 @@ class Configuration:
         self.cxx_runtime_root = None
         self.default_compiler = None
         self.execute_external = False
-        self.test_type_override_path = None
-        self.test_type_override_root = None
         self.format_name = None
         self.lit_config = lit_config
         self.link_shared = True
@@ -50,6 +49,8 @@ class Configuration:
         self.target_info = stl.test.target_info.WindowsLocalTI(lit_config)
         self.test_executor = None
         self.test_source_root = None
+        self.test_type_overrides_path = None
+        self.test_type_overrides_root = None
 
     def get_lit_conf(self, name, default=None):
         val = self.lit_config.params.get(name, None)
@@ -252,7 +253,7 @@ class Configuration:
 
             config_env = self.config.environment.get('PATH', None)
             if config_env is not None:
-                path_list.append(config_env)
+                path_list.append(config_env.strip('; ').replace(';;', ';'))
 
             stl_path_env_var = ';'.join(path_list)
 
@@ -268,25 +269,25 @@ class Configuration:
         self.config.environment = stl_test_env
 
     def configure_test_type_overrides_location(self):
-        test_type_overrides_list_path = self.get_lit_conf(
+        test_type_overrides_path = self.get_lit_conf(
             'test_type_overrides_path', None)
 
-        if test_type_overrides_list_path is not None:
-            self.test_type_overrides_list_path = Path(
-                test_type_overrides_list_path)
+        if test_type_overrides_path is not None:
+            self.test_type_overrides_path = Path(
+                test_type_overrides_path)
         else:
-            self.test_type_overrides_list_path = Path(os.devnull)
+            self.test_type_overrides_path = Path(os.devnull)
 
     def configure_test_type_overrides(self):
         test_type_overrides = getattr(self.lit_config, 'test_type_overrides',
                                       dict())
 
-        if self.test_type_overrides_list_path is None:
-            self.configure_test_type_overrides_list_location()
+        if self.test_type_overrides_path is None:
+            self.configure_test_type_overrides_location()
 
         test_type_overrides[self.config.name] = \
             stl.test.file_parsing.parse_test_type_file(
-                self.test_type_overrides_list_path)
+                self.test_type_overrides_path)
 
         self.lit_config.test_type_overrides = test_type_overrides
         self.config.test_type_overrides = \
