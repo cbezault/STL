@@ -243,7 +243,7 @@ constexpr size_t _Get_least2_chunked_work_chunk_count(const size_t _Hw_threads, 
 
 // STRUCT TEMPLATE _Parallelism_allocator
 struct _Parallelism_allocate_traits {
-    _DECLSPEC_ALLOCATOR static void* _Allocate(const size_t _Bytes) {
+    __declspec(allocator) static void* _Allocate(const size_t _Bytes) {
         void* _Result = ::operator new(_Bytes, nothrow);
         if (!_Result) {
             _Throw_parallelism_resources_exhausted();
@@ -253,7 +253,7 @@ struct _Parallelism_allocate_traits {
     }
 
 #ifdef __cpp_aligned_new
-    _DECLSPEC_ALLOCATOR static void* _Allocate_aligned(const size_t _Bytes, const size_t _Align) {
+    __declspec(allocator) static void* _Allocate_aligned(const size_t _Bytes, const size_t _Align) {
         void* _Result = ::operator new (_Bytes, align_val_t{_Align}, nothrow);
         if (!_Result) {
             _Throw_parallelism_resources_exhausted();
@@ -773,8 +773,8 @@ struct _Static_partition_team { // common data for all static partitioned ops
     _Diff _Unchunked_items;
 
     _Static_partition_team(const _Diff _Count_, const size_t _Chunks_)
-        : _Consumed_chunks{0}, _Chunks{_Chunks_}, _Count{_Count_}, _Chunk_size{_Count_ / static_cast<_Diff>(_Chunks_)},
-          _Unchunked_items{_Count_ % static_cast<_Diff>(_Chunks_)} {
+        : _Consumed_chunks{0}, _Chunks{_Chunks_}, _Count{_Count_}, _Chunk_size{static_cast<_Diff>(_Count_ / static_cast<_Diff>(_Chunks_))},
+          _Unchunked_items{static_cast<_Diff>(_Count_ % static_cast<_Diff>(_Chunks_))} {
         // Calculate common data for statically partitioning iterator ranges.
         // pre: _Count_ >= _Chunks_ && _Chunks_ >= 1
     }

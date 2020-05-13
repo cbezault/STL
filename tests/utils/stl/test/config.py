@@ -9,9 +9,10 @@
 from pathlib import Path
 import os
 import platform
+import re
 import shlex
 
-from stl.test.executor import LocalExecutor
+from stl.test.executor import BuildStepWriter, LocalTestStepWriter
 from stl.compiler import CXXCompiler
 import stl.util
 import stl.test.file_parsing
@@ -34,15 +35,12 @@ class Configuration:
         self.cxx_runtime_root = None
         self.default_compiler = None
         self.execute_external = False
-        self.expected_results_list_path = None
-        self.expected_results_list_root = None
         self.format_name = None
         self.lit_config = lit_config
         self.link_shared = True
         self.long_tests = None
         self.msvc_toolset_libs_root = None
         self.stl_build_root = None
-        self.stl_inc_env_var = None
         self.stl_lib_env_var = None
         self.stl_path_env_var = None
         self.stl_src_root = None
@@ -51,6 +49,8 @@ class Configuration:
         self.target_info = stl.test.target_info.WindowsLocalTI(lit_config)
         self.test_executor = None
         self.test_source_root = None
+        self.test_type_overrides_path = None
+        self.test_type_overrides_root = None
 
     def get_lit_conf(self, name, default=None):
         val = self.lit_config.params.get(name, None)
@@ -90,7 +90,7 @@ class Configuration:
         self.configure_features()
         self.configure_default_compiler()
         self.configure_executors()
-        self.configure_expected_results()
+        self.configure_test_type_overrides()
         self.configure_test_dirs()
         self.configure_test_format()
 
@@ -237,42 +237,6 @@ class Configuration:
         self.cxx_runtime_root = Path(cxx_runtime_root)
         self.cxx_library_root = Path(cxx_library_root)
 
-    def configure_inc_env_var(self):
-        stl_inc_env_var = self.get_lit_conf('stl_inc_env_var', None)
-
-        if stl_inc_env_var is None:
-            stl_inc_env_var = self.config.environment.get('INCLUDE', '')
-
-            if self.cxx_headers is None:
-                self.configure_cxx_headers()
-
-            include_dirs = self.get_lit_conf('include_dirs', [])
-
-            if stl_inc_env_var != '':
-                stl_inc_env_var = ';'.join((str(self.cxx_headers),
-                                            *include_dirs,
-                                            stl_inc_env_var))
-            else:
-                stl_inc_env_var = ';'.join((str(self.cxx_headers),
-                                            *include_dirs))
-
-        self.stl_inc_env_var = stl_inc_env_var
-
-    # Note: This relies on kernel32.lib and ucrt.lib being in the LIB env var
-    def configure_lib_env_var(self):
-        stl_lib_env_var = self.get_lit_conf('stl_lib_env_var', None)
-
-        if stl_lib_env_var is None:
-            stl_lib_env_var = self.config.environment.get('LIB', '')
-
-            if stl_lib_env_var != '':
-                stl_lib_env_var = ';'.join((str(self.cxx_library_root),
-                                            stl_lib_env_var))
-            else:
-                stl_lib_env_var = str(self.cxx_library_root)
-
-        self.stl_lib_env_var = stl_lib_env_var
-
     def configure_path_env_var(self):
         stl_path_env_var = self.get_lit_conf('stl_path_env_var', None)
 
@@ -289,56 +253,45 @@ class Configuration:
 
             config_env = self.config.environment.get('PATH', None)
             if config_env is not None:
-                path_list.append(config_env)
+                path_list.append(config_env.strip('; ').replace(';;', ';'))
 
             stl_path_env_var = ';'.join(path_list)
 
         self.stl_path_env_var = stl_path_env_var
 
     def configure_test_env(self):
-        stl_test_env = self.get_lit_conf('stl_test_env', None)
-
-        if stl_test_env is None:
-            stl_test_env = self.config.environment
-
-        if self.stl_lib_env_var is None:
-            self.configure_inc_env_var()
-
-        if self.stl_lib_env_var is None:
-            self.configure_lib_env_var()
-
         if self.stl_path_env_var is None:
             self.configure_path_env_var()
 
-        stl_test_env['INCLUDE'] = self.stl_inc_env_var
-        stl_test_env['LIB'] = self.stl_lib_env_var
+        stl_test_env = {}
         stl_test_env['PATH'] = self.stl_path_env_var
 
         self.config.environment = stl_test_env
 
-    def configure_expected_results_list_location(self):
-        expected_results_list_path = self.get_lit_conf(
-            'expected_results_list_path', None)
+    def configure_test_type_overrides_location(self):
+        test_type_overrides_path = self.get_lit_conf(
+            'test_type_overrides_path', None)
 
-        if expected_results_list_path is not None:
-            self.expected_results_list_path = Path(
-                expected_results_list_path)
+        if test_type_overrides_path is not None:
+            self.test_type_overrides_path = Path(
+                test_type_overrides_path)
         else:
-            self.expected_results_list_path = Path(os.devnull)
+            self.test_type_overrides_path = Path(os.devnull)
 
-    def configure_expected_results(self):
-        expected_results = getattr(self.lit_config, 'expected_results', dict())
+    def configure_test_type_overrides(self):
+        test_type_overrides = getattr(self.lit_config, 'test_type_overrides',
+                                      dict())
 
-        if self.expected_results_list_path is None:
-            self.configure_expected_results_list_location()
+        if self.test_type_overrides_path is None:
+            self.configure_test_type_overrides_location()
 
-        expected_results[self.config.name] = \
-            stl.test.file_parsing.parse_result_file(
-                self.expected_results_list_path)
+        test_type_overrides[self.config.name] = \
+            stl.test.file_parsing.parse_test_type_file(
+                self.test_type_overrides_path)
 
-        self.lit_config.expected_results = expected_results
-        self.config.expected_results = \
-            getattr(self.config, 'expected_results', dict())
+        self.lit_config.test_type_overrides = test_type_overrides
+        self.config.test_type_overrides = \
+            getattr(self.config, 'test_type_overrides', dict())
 
     def configure_default_compiler(self):
         self.default_compiler = CXXCompiler(None)
@@ -348,10 +301,9 @@ class Configuration:
 
         self.default_compiler.compile_env = self.config.environment
 
-    # TRANSITION: Investigate using SSHExecutor for ARM
     def configure_executors(self):
-        self.build_executor = LocalExecutor()
-        self.test_executor = LocalExecutor()
+        self.build_step_writer = BuildStepWriter()
+        self.test_step_writer = LocalTestStepWriter()
 
     def configure_compile_flags(self):
         self.configure_compile_flags_header_includes()
@@ -423,8 +375,8 @@ class Configuration:
         return getattr(stl.test.format, self.format_name)(
             self.default_compiler,
             self.execute_external,
-            self.build_executor,
-            self.test_executor)
+            self.build_step_writer,
+            self.test_step_writer)
 
     # TRANSITION: Might be nice to actually print something
     def print_config_info(self):
