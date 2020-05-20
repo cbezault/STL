@@ -20846,7 +20846,9 @@ configure_file(
   ${CMAKE_CURRENT_SOURCE_DIR}/tr1/lit.site.cfg.in
   ${CMAKE_CURRENT_BINARY_DIR}/tr1/lit.site.cfg)
 
-set(STL_LIT_CONFIG_MAP 
+set_property(
+    GLOBAL
+    PROPERTY STL_LIT_CONFIG_MAP 
     "map_config(\"${CMAKE_CURRENT_SOURCE_DIR}/libcxx/lit.cfg\", \"${CMAKE_CURRENT_BINARY_DIR}/libcxx/lit.site.cfg\")\n"
     "map_config(\"${CMAKE_CURRENT_SOURCE_DIR}/std/lit.cfg\", \"${CMAKE_CURRENT_BINARY_DIR}/std/lit.site.cfg\")\n"
     "map_config(\"${CMAKE_CURRENT_SOURCE_DIR}/tr1/lit.cfg\", \"${CMAKE_CURRENT_BINARY_DIR}/tr1/lit.site.cfg\")\n")
