@@ -20855,6 +20855,14 @@ set(STL_LIT ${CMAKE_CURRENT_BINARY_DIR}/utils/stl-lit/stl-lit.py)
 
 add_subdirectory(utils/stl-lit)
 
+include(ProcessorCount)
+ProcessorCount(NUM_PROCESSORS)
+add_custom_target(check COMMAND "ctest --progress -j ${NUM_PROCESSORS} --timeout 240 -O \"${CMAKE_CURRENT_BINARY_DIR}/test_results\"" COMMENT "Running tests" USES_TERMINAL)
+
+add_subdirectory(libcxx)
+add_subdirectory(std)
+add_subdirectory(tr1)
+
 set(Python_FIND_STRATEGY VERSION)
 find_package(Python3)
 
@@ -20902,14 +20910,6 @@ if(RUN_LIT)
                 "${CMAKE_CURRENT_SOURCE_DIR}/tr1/tests"
         OUTPUT_QUIET)
 endif()
-
-include(ProcessorCount)
-ProcessorCount(NUM_PROCESSORS)
-add_custom_target(check COMMAND "ctest --progress -j ${NUM_PROCESSORS} --timeout 240 -O \"${CMAKE_CURRENT_BINARY_DIR}/test_results\"" COMMENT "Running tests" USES_TERMINAL)
-
-add_subdirectory(libcxx)
-add_subdirectory(std)
-add_subdirectory(tr1)
 
 get_property(STL_LIT_GENERATED_FILES GLOBAL PROPERTY STL_LIT_GENERATED_FILES)
 list(SORT STL_LIT_GENERATED_FILES)
