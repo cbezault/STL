@@ -20849,9 +20849,11 @@ configure_file(
 set_property(
     GLOBAL
     PROPERTY STL_LIT_CONFIG_MAP 
-    "map_config(\"${CMAKE_CURRENT_SOURCE_DIR}/libcxx/lit.cfg\", \"${CMAKE_CURRENT_BINARY_DIR}/libcxx/lit.site.cfg\")\n"
-    "map_config(\"${CMAKE_CURRENT_SOURCE_DIR}/std/lit.cfg\", \"${CMAKE_CURRENT_BINARY_DIR}/std/lit.site.cfg\")\n"
-    "map_config(\"${CMAKE_CURRENT_SOURCE_DIR}/tr1/lit.cfg\", \"${CMAKE_CURRENT_BINARY_DIR}/tr1/lit.site.cfg\")\n")
+    "\
+map_config(\"${CMAKE_CURRENT_SOURCE_DIR}/libcxx/lit.cfg\", \"${CMAKE_CURRENT_BINARY_DIR}/libcxx/lit.site.cfg\")\n\
+map_config(\"${CMAKE_CURRENT_SOURCE_DIR}/std/lit.cfg\", \"${CMAKE_CURRENT_BINARY_DIR}/std/lit.site.cfg\")\n\
+map_config(\"${CMAKE_CURRENT_SOURCE_DIR}/tr1/lit.cfg\", \"${CMAKE_CURRENT_BINARY_DIR}/tr1/lit.site.cfg\")\n"
+)
 
 set(STL_LIT ${CMAKE_CURRENT_BINARY_DIR}/utils/stl-lit/stl-lit.py)
 
