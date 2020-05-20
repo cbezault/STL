@@ -116,31 +116,24 @@ class STLTestFormat:
     def getTestsInDirectory(self, testSuite, path_in_suite,
                             litConfig, localConfig, test_class=STLTest):
         source_path = testSuite.getSourcePath(path_in_suite)
-
         if not self.isLegalDirectory(source_path, litConfig):
             return
 
-        file_handle = None
-        mangled_dir_name = stl.util.mangleCMakeTarget(testSuite.name + '--' + '-'.join(path_in_suite))
+        mangled_updir = \
+            stl.util.mangleCMakeTarget(testSuite.name + '--' +
+                                       '-'.join(path_in_suite[:-1]))
+        mangled_dir = \
+            stl.util.mangleCMakeTarget(testSuite.name + '--' +
+                                       '-'.join(path_in_suite))
 
-        if testSuite.name not in _test_suite_file_handles:
-            test_list = Path(testSuite.exec_root) / 'tests.cmake'
-            file_handle = test_list.open('w')
-            _test_suite_file_handles[testSuite.name] = file_handle
-
-            dep_string = 'add_custom_target({dir_name})\nadd_dependencies({suite_name} {dir_name})'
-            print(dep_string.format(suite_name=testSuite.name,
-                                    dir_name=mangled_dir_name),
-                  file=file_handle)
-        else:
-            dir_path = Path(testSuite.exec_root) / os.path.join(path_in_suite)
-            dir_path.mkdir(parents=True, exist_ok=True)
-            dir_file = dir_path / 'CMakeLists.txt'
-            file_handle = dir_file.open('w')
-            dep_string = 'add_custom_target({dir_name})\nadd_dependencies({updir_name} {dir_name})\nadd_custom_target(check-{dir_name} COMMAND -I \\"${CMAKE_CURRENT_BINARY_DIR}/CTestTestfile.cmake\\"" DEPENDS {dir_name} COMMENT "Running {dir_name} tests" USES_TERMINAL)'
-            print(dep_string.format(updir_name=stl.util.mangleCMakeTarget(testSuite.name + '--' + '-'.join(path_in_suite[:-1])),
-                                    dir_name=mangled_dir_name),
-                  file=file_handle)
+        dir_path = Path(testSuite.exec_root) / os.path.join(path_in_suite)
+        dir_path.mkdir(parents=True, exist_ok=True)
+        dir_file = dir_path / 'CMakeLists.txt'
+        file_handle = dir_file.open('w')
+        dep_string = 'add_custom_target({dir_name})\nadd_dependencies({updir_name} {dir_name})\nadd_custom_target(check-{dir_name} ctest -I "${CMAKE_CURRENT_BINARY_DIR}/CTestTestfile.cmake" DEPENDS {dir_name} COMMENT "Running {dir_name} tests" USES_TERMINAL)'
+        print(dep_string.format(updir_name=mangled_updir,
+                                dir_name=mangled_dir),
+              file=file_handle)
 
         envlst_path = self.getEnvLst(source_path, localConfig)
         exec_path = Path(os.path.join(testSuite.getExecPath(path_in_suite)))
@@ -180,13 +173,16 @@ class STLTestFormat:
                                 top_level_test_dir = test.getOutputDir().parent
                                 top_level_test_file = \
                                     top_level_test_dir / 'CMakeLists.txt'
-                                top_level_test_file_handle = \
-                                    top_level_test_file.open('w')
                                 mangled_test_dir_name = \
                                     stl.util.mangleCMakeTarget(
-                                        testSuite.name + '--' + '-'.join(top_level_test_dir.relative_to(Path(
-                                print(
-
+                                        testSuite.name + '--' +
+                                        test.getBaseTestName())
+                                test_string = 'add_custom_target({test_target})\nadd_dependencies({dir_name} {test_target})\nadd_custom_target(check-{test_target} ctest -I "{top_level_test_dir}/CTestTestfile.cmake" DEPENDS {test_target})'
+                                with top_level_test_file.open('w') as f:
+                                    print(test_string.format(test_target=mangled_test_dir_name,
+                                                             dir_name=mangled_dir,
+                                                             top_level_test_dir=str(top_level_test_dir),
+                                          file=f)
                                 is_first = False
 
                             out_string = \
@@ -226,10 +222,12 @@ class STLTestFormat:
             buildSteps, testSteps = self.getSteps(test, lit_config)
 
             test_file = test.getTestFilePath()
-            test_target = 'add_custom_target(' + test.mangled_name + ')'
+            targets = 'add_custom_target({test_target})\nadd_custom_target(check-{test_target} ctest -I "{test_output_dir}/CTestTestfile.cmake" DEPENDS {test_target} USES_TERMINAL)'
 
             with test_file.open('w') as f:
-                print(test_target, file=f)
+                print(targets.format(test_target=test.mangled_name,
+                                     test_output_dir=test.getOutputDir()),
+                      file=f)
 
                 for step in buildSteps:
                     self.build_step_writer.write(test, step, f)

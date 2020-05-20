@@ -103,10 +103,13 @@ class STLTest(Test):
         return self.getExecDir() / (self.getOutputBaseName() + '.exe')
 
     def getTestFilePath(self):
-        return self.getOutputDir() / 'test.cmake'
+        return self.getOutputDir() / 'CTestTestfile.cmake'
+
+    def getBaseTestName(self):
+        return '/'.join(self.path_in_suite[:-1])
 
     def getTestName(self):
-        return '/'.join(self.path_in_suite[:-1]) + ':' + self.env_num
+        return self.getBaseTestName() + ':' + self.env_num
 
     def getFullName(self):
         return self.suite.config.name + '::' + self.getTestName()
@@ -208,5 +211,5 @@ class LibcxxTest(STLTest):
             self.suite.getExecPath(self.path_in_suite[:-1]))) / dir_name / \
             self.env_num
 
-    def getTestName(self):
-        return '/'.join(self.path_in_suite) + ':' + self.env_num
+    def getBaseTestName(self):
+        return '/'.join(self.path_in_suite)

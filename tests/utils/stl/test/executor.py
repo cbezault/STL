@@ -22,24 +22,28 @@ class BuildStepWriter:
         args = args.replace('\\', '/')
 
         pass_string = \
-            'add_custom_command(OUTPUT {out} COMMAND {cmd} ARGS {args} DEPENDS msvcpd_implib msvcp_implib libcpmt libcpmt1 libcpmtd libcpmtd1 libcpmtd0 {deps} WORKING_DIRECTORY "{cwd}")\nadd_custom_target({name} DEPENDS {out})\nadd_dependencies({top_level_name} {name})'
+            'add_custom_command(OUTPUT {out} COMMAND {cmd} ARGS {args} DEPENDS msvcpd_implib msvcp_implib libcpmt libcpmt1 libcpmtd libcpmtd1 libcpmtd0 {deps} WORKING_DIRECTORY "{cwd}")\nadd_custom_target({test_target} DEPENDS {out})\nadd_dependencies({parent_target} {test_target})'
         fail_string = \
-            'add_test(NAME {name} COMMAND {cmd} WORKING_DIRECTORY "{cwd}")\nset_property(TEST {name} PROPERTY WILL_FAIL TRUE)'
+            'add_test(NAME {test_target} COMMAND {cmd} WORKING_DIRECTORY "{cwd}")\nset_property(TEST {test_target} PROPERTY WILL_FAIL TRUE)'
         env_prop = \
-            'set_property(TEST {name} PROPERTY ENVIRONMENT {env})'
+            'set_property(TEST {test_target} PROPERTY ENVIRONMENT {env})'
+
+        parent_target = test.mangled_name
+        test_target = test.mangled_name + '_' + str(step.num)
 
         if not step.should_fail:
-            name = test.mangled_name + '_' + str(step.num)
-            print(pass_string.format(out=' '.join(map(lambda dep: dep.as_posix(), step.out_files)),
-                                     cmd=build_cmd,
-                                     args=args,
-                                     deps='"' + '" "'.join(map(lambda dep: dep.as_posix(), step.dependencies)) + '"',
-                                     cwd=work_dir.as_posix(),
-                                     name=name,
-                                     top_level_name=test.mangled_name),
+            out = ' '.join(map(lambda dep: dep.as_posix(), step.out_files))
+            deps = \
+                '"' + \
+                '" "'.join(map(lambda d: d.as_posix(), step.dependencies)) + \
+                '"'
+            print(pass_string.format(out=out, cmd=build_cmd, args=args,
+                                     deps=deps, cwd=work_dir.as_posix(),
+                                     test_target=test_target,
+                                     parent_target=parent_target),
                   file=test_file_handle)
         else:
-            print(fail_string.format(name=test.mangled_name,
+            print(fail_string.format(test_target=test.mangled_name,
                                      cmd=build_cmd + ' ' + args,
                                      cwd=work_dir.as_posix()),
                   file=test_file_handle)
@@ -53,7 +57,7 @@ class BuildStepWriter:
                     '" "'.join(env_list).replace('\\', '/').replace(';', '\\;') + \
                     '"'
 
-                print(env_prop.format(name=test.mangled_name,
+                print(env_prop.format(test_target=test.mangled_name,
                                       env=cmake_env_list),
                       file=test_file_handle)
 
