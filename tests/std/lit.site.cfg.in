@@ -15,4 +15,4 @@ config.test_exec_root           = "@STD_TEST_OUTPUT_DIR@"
 config.test_subdirs_file        = "@STD_TEST_SUBDIRS_FILE@"
 config.test_subdirs_root        = "@STD_TEST_SUBDIRS_ROOT@"
 
-lit_config.load_config(config, "@CMAKE_CURRENT_SOURCE_DIR@/lit.cfg")
+lit_config.load_config(config, "@STL_SOURCE_DIR@/tests/std/lit.cfg")
