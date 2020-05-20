@@ -157,7 +157,6 @@ class STLTestFormat:
                                      "d}"
 
                     is_first = True
-                    top_level_test_file_handle = None
                     for env_entry, env_num \
                             in zip(env_entries, itertools.count()):
                         test_config = copy.deepcopy(localConfig)
@@ -181,19 +180,12 @@ class STLTestFormat:
                                 with top_level_test_file.open('w') as f:
                                     print(test_string.format(test_target=mangled_test_dir_name,
                                                              dir_name=mangled_dir,
-                                                             top_level_test_dir=str(top_level_test_dir),
+                                                             top_level_test_dir=str(top_level_test_dir)),
                                           file=f)
                                 is_first = False
-
-                            out_string = \
-                                per_test_string.format(test_file=test_file,
-                                                       dir_name=dir_name,
-                                                       test_name=test.mangled_name)
-                            print(out_string, file=file_handle)
-
                         yield test
             elif self.isLegalDirectory(filepath, litConfig):
-                per_subdir_string = 'add_subdirectory({subdir_name})'
+                pass
 
         file_handle.close()
 
