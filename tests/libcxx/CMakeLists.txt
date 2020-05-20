@@ -7,5 +7,3 @@ ProcessorCount(NUM_PROCESSORS)
 add_custom_target(libcxx)
 add_dependencies(check libcxx)
 add_custom_target(check-libcxx COMMAND "ctest --progress -j ${NUM_PROCESSORS} --timeout 240 -O \"${CMAKE_CURRENT_BINARY_DIR}/test_results.log\" -I \"${CMAKE_CURRENT_BINARY_DIR}/CTestTestfile.cmake\"" DEPENDS libcxx COMMENT "Running libcxx tests" USES_TERMINAL)
-
-include("${CMAKE_CURRENT_BINARY_DIR}/tests.cmake")
