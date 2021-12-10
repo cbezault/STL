@@ -65,6 +65,7 @@ import <set>;
 import <shared_mutex>;
 import <source_location>;
 import <span>;
+import <spanstream>;
 import <sstream>;
 import <stack>;
 import <stdexcept>;
@@ -91,6 +92,7 @@ import <version>;
 
 #include <assert.h>
 #include <stdio.h>
+
 #include <force_include.hpp>
 using namespace std;
 
@@ -126,11 +128,7 @@ int main() {
 
     {
         puts("Testing <array>.");
-#ifdef MSVC_INTERNAL_TESTING // TRANSITION, VSO-1309454 (duplicated deduction guides)
         constexpr array arr{10, 20, 30, 40, 50};
-#else // ^^^ no workaround / workaround vvv
-        constexpr array<int, 5> arr{10, 20, 30, 40, 50};
-#endif // ^^^ workaround ^^^
         assert(arr[2] == 30);
         static_assert(arr[2] == 30);
     }
@@ -305,7 +303,8 @@ int main() {
 
     {
         puts("Testing <format>.");
-        assert(format("{} {}", "testing", "format") == "testing format");
+        assert(format("{} {}", 1729, "kittens") == "1729 kittens");
+        assert(format(L"{} {}", 1729, L"kittens") == L"1729 kittens");
     }
 
     {
@@ -581,17 +580,8 @@ int main() {
     {
         puts("Testing <ranges>.");
         constexpr int arr[]{11, 0, 22, 0, 33, 0, 44, 0, 55};
-#ifdef MSVC_INTERNAL_TESTING // TRANSITION, VSO-1309454 (duplicated deduction guides)
         assert(ranges::distance(views::filter(arr, [](int x) { return x == 0; })) == 4);
         static_assert(ranges::distance(views::filter(arr, [](int x) { return x != 0; })) == 5);
-#else // ^^^ no workaround / workaround vvv
-        auto is_zero = [](int x) { return x == 0; };
-        using FV1    = ranges::filter_view<ranges::ref_view<decltype(arr)>, decltype(is_zero)>;
-        assert(ranges::distance(FV1{arr, is_zero}) == 4);
-        constexpr auto not_zero = [](int x) { return x != 0; };
-        using FV2 = ranges::filter_view<ranges::ref_view<decltype(arr)>, remove_const_t<decltype(not_zero)>>;
-        static_assert(ranges::distance(FV2{arr, not_zero}) == 5);
-#endif // ^^^ workaround ^^^
     }
 
     {
@@ -707,6 +697,38 @@ int main() {
         constexpr span<const int, 3> mid = whole.subspan<1, 3>();
         assert(mid[0] == 22 && mid[1] == 33 && mid[2] == 44);
         static_assert(mid[0] == 22 && mid[1] == 33 && mid[2] == 44);
+    }
+
+    {
+        puts("Testing <spanstream>.");
+        char ibuffer[] = "1 2 3 4 5";
+        ispanstream is{span<char>{ibuffer}};
+        int read = 0;
+        for (int expected = 1; expected <= 5; ++expected) {
+            assert(is.good());
+            is >> read;
+            assert(read == expected);
+        }
+
+        const char const_buffer[] = "1 2 3 4 5";
+        basic_ispanstream<char> is_const_buffer{span<const char>{const_buffer}};
+        read = 0;
+        for (int expected = 1; expected <= 5; ++expected) {
+            assert(is_const_buffer.good());
+            is_const_buffer >> read;
+            assert(read == expected);
+        }
+
+        const auto expected = "102030"sv;
+        char obuffer[10];
+        ospanstream os{span<char>{obuffer}};
+        os << 10 << 20 << 30;
+        assert(equal(begin(os.span()), end(os.span()), begin(expected), end(expected)));
+
+        char buffer[10];
+        spanstream s{span<char>{buffer}};
+        s << 10 << 20 << 30;
+        assert(equal(begin(s.span()), end(s.span()), begin(expected), end(expected)));
     }
 
     {

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <cassert>
+#include <map>
 #include <memory>
 #include <scoped_allocator>
 #include <tuple>
@@ -171,6 +172,23 @@ constexpr bool test_P0591R4() {
     }
 
     return true;
+}
+
+void test_GH_2021() { // COMPILE-ONLY
+    pmr::map<int, pair<int, int>> tags;
+    tags[0];
+}
+
+struct MoveOnlyType {
+    MoveOnlyType()               = default;
+    MoveOnlyType(MoveOnlyType&&) = default;
+};
+
+void test_LWG3527() { // COMPILE-ONLY
+    allocator<MoveOnlyType> alloc;
+    MoveOnlyType obj;
+    pair<MoveOnlyType&&, MoveOnlyType&&> p{move(obj), move(obj)};
+    [[maybe_unused]] auto t = uses_allocator_construction_args<pair<MoveOnlyType&&, MoveOnlyType&&>>(alloc, move(p));
 }
 
 int main() {

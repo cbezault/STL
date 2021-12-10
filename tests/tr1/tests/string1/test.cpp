@@ -503,7 +503,7 @@ void test_main() { // test basic workings of string definitions
         bool ok        = false;
         STD string str("x");
         try {
-            STD stoi(str, &idx);
+            (void) STD stoi(str, &idx);
         } catch (STD invalid_argument) {
             ok = true;
         } catch (...) {
@@ -513,7 +513,7 @@ void test_main() { // test basic workings of string definitions
         CHECK_SIZE_T(idx, 0);
 
         try {
-            STD stoi("0xfffffffff", &idx, 0);
+            (void) STD stoi("0xfffffffff", &idx, 0);
         } catch (STD out_of_range) {
             ok = true;
         } catch (...) {
@@ -554,6 +554,7 @@ void test_main() { // test basic workings of string definitions
         hash_val        = STD hash<STD wstring>()(STD wstring(L"abc"));
         hash_val        = STD hash<STD u16string>()(STD u16string(3, 'x'));
         hash_val        = STD hash<STD u32string>()(STD u32string(3, 'x'));
+        (void) hash_val;
     }
 
     {

@@ -138,7 +138,7 @@ constexpr auto get_cute_and_scratchy() {
 
 template <class CharType>
 struct string_view_convertible {
-    _CONSTEXPR20_CONTAINER operator basic_string_view<CharType>() const {
+    constexpr operator basic_string_view<CharType>() const {
         if constexpr (is_same_v<CharType, char>) {
             return view_input;
 #ifdef __cpp_char8_t
@@ -166,7 +166,7 @@ constexpr bool equalRanges(const Range1& range1, const Range2& range2) noexcept 
 }
 
 template <class CharType>
-_CONSTEXPR20_CONTAINER bool test_interface() {
+constexpr bool test_interface() {
 #ifndef __EDG__ // TRANSITION, VSO-1273296
     using str = basic_string<CharType>;
 
@@ -213,10 +213,10 @@ _CONSTEXPR20_CONTAINER bool test_interface() {
 
         str ptr_size_constructed(get_literal_input<CharType>(), 2);
         assert(equalRanges(ptr_size_constructed, "He"sv));
-#if defined(MSVC_INTERNAL_TESTING) || defined(__EDG__) // TRANSITION, VSO-1270433
+
         str iterator_constructed(literal_constructed.begin(), literal_constructed.end());
         assert(equalRanges(iterator_constructed, literal_constructed));
-#endif // defined(MSVC_INTERNAL_TESTING) || defined(__EDG__)
+
         const string_view_convertible<CharType> convertible;
         str conversion_constructed(convertible);
         assert(equalRanges(conversion_constructed, literal_constructed));
@@ -261,10 +261,10 @@ _CONSTEXPR20_CONTAINER bool test_interface() {
 
         str ptr_size_constructed(get_literal_input<CharType>(), 2, alloc);
         assert(equalRanges(ptr_size_constructed, "He"sv));
-#if defined(MSVC_INTERNAL_TESTING) || defined(__EDG__) // TRANSITION, VSO-1270433
+
         str iterator_constructed(literal_constructed.begin(), literal_constructed.end(), alloc);
         assert(equalRanges(iterator_constructed, literal_constructed));
-#endif // defined(MSVC_INTERNAL_TESTING) || defined(__EDG__)
+
         const string_view_convertible<CharType> convertible;
         str conversion_constructed(convertible, alloc);
         assert(equalRanges(conversion_constructed, literal_constructed));
@@ -887,6 +887,22 @@ _CONSTEXPR20_CONTAINER bool test_interface() {
         assert(!input_string_false.ends_with(get_literal_input<CharType>()));
     }
 
+#if _HAS_CXX23
+    { // contains
+        const str hello_fluffy_kittens = get_literal_input<CharType>(); // "Hello fluffy kittens"
+        constexpr auto kitten_ptr      = get_cat<CharType>(); // "kitten"
+        constexpr auto dog_ptr         = get_dog<CharType>(); // "dog"
+
+        assert(hello_fluffy_kittens.contains(kitten_ptr));
+        assert(hello_fluffy_kittens.contains(basic_string_view{kitten_ptr}));
+        assert(hello_fluffy_kittens.contains(CharType{'e'}));
+
+        assert(!hello_fluffy_kittens.contains(dog_ptr));
+        assert(!hello_fluffy_kittens.contains(basic_string_view{dog_ptr}));
+        assert(!hello_fluffy_kittens.contains(CharType{'z'}));
+    }
+#endif // _HAS_CXX23
+
     { // replace
         const str input = get_dog<CharType>();
 
@@ -1006,6 +1022,108 @@ _CONSTEXPR20_CONTAINER bool test_interface() {
         resized.resize(6, CharType{'a'});
         assert(equalRanges(resized, "Helaaa"sv));
     }
+
+#if _HAS_CXX23
+    { // resize_and_overwrite
+        constexpr basic_string_view hello_fluffy_kittens = get_view_input<CharType>();
+        constexpr basic_string_view hello                = hello_fluffy_kittens.substr(0, 5);
+        constexpr basic_string_view dog                  = get_dog<CharType>();
+        constexpr basic_string_view kitten               = get_cat<CharType>();
+
+        str s;
+        s.resize_and_overwrite(5, [=](CharType* p, size_t n) {
+            assert(n == 5);
+            hello.copy(p, 5);
+            return 5u;
+        });
+
+        assert(s == hello);
+        assert(s.size() == 5);
+        assert(s.capacity() >= 5);
+        assert(s[5] == 0);
+
+        s.resize_and_overwrite(8, [=](CharType* p, size_t n) {
+            assert(n == 8);
+            assert(equal(hello.begin(), hello.end(), p, p + 5));
+            dog.copy(p, 3);
+            return 3u;
+        });
+
+        assert(s == dog);
+        assert(s.size() == 3);
+        assert(s.capacity() >= 3);
+        assert(s[3] == 0);
+
+        s.resize_and_overwrite(6, [=](CharType* p, size_t n) {
+            assert(n == 6);
+            assert(equal(dog.begin(), dog.end(), p, p + 3));
+            kitten.copy(p, 6);
+            return 6u;
+        });
+
+        assert(s == kitten);
+        assert(s.size() == 6);
+        assert(s.capacity() >= 6);
+        assert(s[6] == 0);
+
+        s.resize_and_overwrite(0, [=](CharType*, size_t n) {
+            assert(n == 0);
+            return 0u;
+        });
+
+        assert(s.size() == 0);
+        assert(s[0] == 0);
+
+        s = dog;
+
+        s.resize_and_overwrite(6, [=](CharType* p, size_t n) {
+            assert(n == 6);
+            assert(equal(dog.begin(), dog.end(), p, p + 3));
+            return 0u;
+        });
+
+        assert(s.size() == 0);
+        assert(s[0] == 0);
+
+        s = kitten;
+
+        s.resize_and_overwrite(3, [=](CharType* p, size_t n) {
+            assert(n == 3);
+            assert(equal(kitten.begin(), kitten.begin() + 3, p, p + 3));
+            dog.copy(p, 3);
+            return 3u;
+        });
+
+        assert(s == dog);
+        assert(s.size() == 3);
+        assert(s.capacity() >= 3);
+        assert(s[3] == 0);
+
+        s.resize_and_overwrite(20, [=](CharType* p, size_t n) {
+            assert(n == 20);
+            assert(equal(dog.begin(), dog.end(), p, p + 3));
+            hello_fluffy_kittens.copy(p, 20);
+            return 20u;
+        });
+
+        assert(s == hello_fluffy_kittens);
+        assert(s.size() == 20);
+        assert(s.capacity() >= 20);
+        assert(s[20] == 0);
+
+        s.resize_and_overwrite(3, [=](CharType* p, size_t n) {
+            assert(n == 3);
+            assert(equal(hello_fluffy_kittens.begin(), hello_fluffy_kittens.begin() + 3, p, p + 3));
+            dog.copy(p, 3);
+            return 3u;
+        });
+
+        assert(s == dog);
+        assert(s.size() == 3);
+        assert(s.capacity() >= 3);
+        assert(s[3] == 0);
+    }
+#endif // _HAS_CXX23
 
     { // swap
         constexpr basic_string_view<CharType> expected_first  = get_dog<CharType>();
@@ -1494,7 +1612,7 @@ _CONSTEXPR20_CONTAINER bool test_interface() {
     return true;
 }
 
-_CONSTEXPR20_CONTAINER bool test_udls() {
+constexpr bool test_udls() {
 #ifndef __EDG__ // TRANSITION, VSO-1273296
     assert(equalRanges("purr purr"s, "purr purr"sv));
 #ifdef __cpp_char8_t
@@ -1515,7 +1633,7 @@ struct CharLikeType {
 };
 
 template <class CharType>
-_CONSTEXPR20_CONTAINER bool test_iterators() {
+constexpr bool test_iterators() {
 #ifndef __EDG__ // TRANSITION, VSO-1273296
     using str               = basic_string<CharType>;
     str literal_constructed = get_literal_input<CharType>();
@@ -1636,7 +1754,7 @@ _CONSTEXPR20_CONTAINER bool test_iterators() {
 }
 
 template <class CharType>
-_CONSTEXPR20_CONTAINER bool test_growth() {
+constexpr bool test_growth() {
     using str = basic_string<CharType>;
 #ifndef __EDG__ // TRANSITION, VSO-1273296
     {
@@ -1769,7 +1887,6 @@ int main() {
     test_growth<char32_t>();
     test_growth<wchar_t>();
 
-#ifdef __cpp_lib_constexpr_string
     static_assert(test_interface<char>());
 #ifdef __cpp_char8_t
     static_assert(test_interface<char8_t>());
@@ -1795,5 +1912,4 @@ int main() {
     static_assert(test_growth<char16_t>());
     static_assert(test_growth<char32_t>());
     static_assert(test_growth<wchar_t>());
-#endif // __cpp_lib_constexpr_string
 }

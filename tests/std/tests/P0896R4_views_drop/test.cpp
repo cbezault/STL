@@ -16,13 +16,26 @@ using namespace std;
 
 #pragma warning(disable : 6011) // Dereferencing NULL pointer '%s'
 
+struct evil_convertible_to_difference {
+    evil_convertible_to_difference() = default;
+    evil_convertible_to_difference(const evil_convertible_to_difference&) {
+        throw 42;
+    }
+    evil_convertible_to_difference(evil_convertible_to_difference&&) = default;
+
+    evil_convertible_to_difference& operator=(const evil_convertible_to_difference&) {
+        throw 42;
+        return *this;
+    }
+    evil_convertible_to_difference& operator=(evil_convertible_to_difference&&) = default;
+
+    constexpr operator int() const noexcept {
+        return 4;
+    }
+};
+
 // Test a silly precomposed range adaptor pipeline
 constexpr auto pipeline = views::drop(1) | views::drop(1) | views::drop(1) | views::drop(1);
-
-template <class>
-inline constexpr bool is_span = false;
-template <class T, size_t N>
-inline constexpr bool is_span<span<T, N>> = true;
 
 template <class>
 inline constexpr bool is_subrange = false;
@@ -75,13 +88,13 @@ using pipeline_t = mapped_t<mapped_t<mapped_t<mapped_t<Rng>>>>;
 
 template <class Rng>
 concept CanViewDrop = requires(Rng&& r) {
-    views::drop(static_cast<Rng&&>(r), 42);
+    views::drop(forward<Rng>(r), 42);
 };
 
 template <ranges::input_range Rng, ranges::random_access_range Expected>
 constexpr bool test_one(Rng&& rng, Expected&& expected) {
     using ranges::drop_view, ranges::common_range, ranges::enable_borrowed_range, ranges::iterator_t, ranges::prev,
-        ranges::range, ranges::sentinel_t, ranges::sized_range;
+        ranges::range, ranges::sentinel_t, ranges::sized_range, ranges::borrowed_range;
     using ranges::input_range, ranges::forward_range, ranges::bidirectional_range, ranges::random_access_range,
         ranges::contiguous_range;
 
@@ -101,7 +114,7 @@ constexpr bool test_one(Rng&& rng, Expected&& expected) {
     constexpr auto closure = views::drop(4);
 
     // ... with lvalue argument
-    STATIC_ASSERT(CanViewDrop<Rng&> == (!is_view || copyable<V>) );
+    STATIC_ASSERT(CanViewDrop<Rng&> == (!is_view || copy_constructible<V>) );
     if constexpr (CanViewDrop<Rng&>) { // Validate lvalue
         constexpr bool is_noexcept = !is_view || (is_nothrow_copy_constructible_v<V> && !is_subrange<V>);
 
@@ -116,8 +129,8 @@ constexpr bool test_one(Rng&& rng, Expected&& expected) {
     }
 
     // ... with const lvalue argument
-    STATIC_ASSERT(CanViewDrop<const remove_reference_t<Rng>&> == (!is_view || copyable<V>) );
-    if constexpr (is_span<remove_cvref_t<Rng>> || (is_view && copyable<V>) ) {
+    STATIC_ASSERT(CanViewDrop<const remove_reference_t<Rng>&> == (!is_view || copy_constructible<V>) );
+    if constexpr (is_view && copy_constructible<V>) {
         constexpr bool is_noexcept = (is_nothrow_copy_constructible_v<V> && !is_subrange<V>);
 
         STATIC_ASSERT(same_as<decltype(views::drop(as_const(rng), 4)), M>);
@@ -143,8 +156,8 @@ constexpr bool test_one(Rng&& rng, Expected&& expected) {
     }
 
     // ... with rvalue argument
-    STATIC_ASSERT(CanViewDrop<remove_reference_t<Rng>> == is_view || enable_borrowed_range<remove_cvref_t<Rng>>);
-    if constexpr (is_span<remove_cvref_t<Rng>> || is_view) {
+    STATIC_ASSERT(CanViewDrop<remove_reference_t<Rng>> == (is_view || movable<remove_reference_t<Rng>>) );
+    if constexpr (is_view) {
         constexpr bool is_noexcept = is_nothrow_move_constructible_v<V> && !is_subrange<V>;
         STATIC_ASSERT(same_as<decltype(views::drop(move(rng), 4)), M>);
         STATIC_ASSERT(noexcept(views::drop(move(rng), 4)) == is_noexcept);
@@ -154,10 +167,10 @@ constexpr bool test_one(Rng&& rng, Expected&& expected) {
 
         STATIC_ASSERT(same_as<decltype(move(rng) | pipeline), pipeline_t<remove_reference_t<Rng>>>);
         STATIC_ASSERT(noexcept(move(rng) | pipeline) == is_noexcept);
-    } else if constexpr (enable_borrowed_range<remove_cvref_t<Rng>>) {
-        using S                    = decltype(ranges::subrange{declval<remove_reference_t<Rng>>()});
+    } else if constexpr (movable<remove_reference_t<Rng>>) {
+        using S                    = ranges::owning_view<remove_reference_t<Rng>>;
         using RS                   = drop_view<S>;
-        constexpr bool is_noexcept = noexcept(S{declval<remove_reference_t<Rng>>()});
+        constexpr bool is_noexcept = is_nothrow_move_constructible_v<remove_reference_t<Rng>>;
 
         STATIC_ASSERT(same_as<decltype(views::drop(move(rng), 4)), RS>);
         STATIC_ASSERT(noexcept(views::drop(move(rng), 4)) == is_noexcept);
@@ -170,9 +183,8 @@ constexpr bool test_one(Rng&& rng, Expected&& expected) {
     }
 
     // ... with const rvalue argument
-    STATIC_ASSERT(CanViewDrop<const remove_reference_t<Rng>> == (is_view && copyable<V>)
-                  || (!is_view && enable_borrowed_range<remove_cvref_t<Rng>>) );
-    if constexpr (is_span<remove_cvref_t<Rng>> || (is_view && copyable<V>) ) {
+    STATIC_ASSERT(CanViewDrop<const remove_reference_t<Rng>> == (is_view && copy_constructible<V>) );
+    if constexpr (is_view && copy_constructible<V>) {
         constexpr bool is_noexcept = is_nothrow_copy_constructible_v<V> && !is_subrange<V>;
 
         STATIC_ASSERT(same_as<decltype(views::drop(move(as_const(rng)), 4)), M>);
@@ -182,19 +194,6 @@ constexpr bool test_one(Rng&& rng, Expected&& expected) {
         STATIC_ASSERT(noexcept(move(as_const(rng)) | closure) == is_noexcept);
 
         STATIC_ASSERT(same_as<decltype(move(as_const(rng)) | pipeline), pipeline_t<const remove_reference_t<Rng>>>);
-        STATIC_ASSERT(noexcept(move(as_const(rng)) | pipeline) == is_noexcept);
-    } else if constexpr (!is_view && enable_borrowed_range<remove_cvref_t<Rng>>) {
-        using S                    = decltype(ranges::subrange{declval<const remove_reference_t<Rng>>()});
-        using RS                   = drop_view<S>;
-        constexpr bool is_noexcept = noexcept(S{declval<const remove_reference_t<Rng>>()});
-
-        STATIC_ASSERT(same_as<decltype(views::drop(move(as_const(rng)), 4)), RS>);
-        STATIC_ASSERT(noexcept(views::drop(move(as_const(rng)), 4)) == is_noexcept);
-
-        STATIC_ASSERT(same_as<decltype(move(as_const(rng)) | closure), RS>);
-        STATIC_ASSERT(noexcept(move(as_const(rng)) | closure) == is_noexcept);
-
-        STATIC_ASSERT(same_as<decltype(move(as_const(rng)) | pipeline), mapped_t<mapped_t<mapped_t<RS>>>>);
         STATIC_ASSERT(noexcept(move(as_const(rng)) | pipeline) == is_noexcept);
     }
 
@@ -209,6 +208,7 @@ constexpr bool test_one(Rng&& rng, Expected&& expected) {
     STATIC_ASSERT(bidirectional_range<R> == bidirectional_range<Rng>);
     STATIC_ASSERT(random_access_range<R> == random_access_range<Rng>);
     STATIC_ASSERT(contiguous_range<R> == contiguous_range<Rng>);
+    STATIC_ASSERT(borrowed_range<R> == borrowed_range<V>);
 
     // Validate drop_view::size
     STATIC_ASSERT(CanMemberSize<R> == CanSize<Rng>);
@@ -380,7 +380,7 @@ struct instantiator {
         R r{some_ints};
         test_one(r, only_four_ints);
 
-        R empty_range{};
+        R empty_range{span<const int, 0>{}};
         test_one(empty_range, span<const int, 0>{});
     }
 };
@@ -460,11 +460,7 @@ constexpr void output_range_test() {
         test::CanCompare::no, test::ProxyRef::yes, test::CanView::yes, test::Copyability::move_only>;
     int some_writable_ints[] = {0, 1, 2, 3};
     STATIC_ASSERT(same_as<decltype(views::drop(R{some_writable_ints}, 2)), ranges::drop_view<R>>);
-#if !defined(__clang__) && !defined(__EDG__) // TRANSITION, VSO-1217687
-    ranges::fill(views::drop(R{some_writable_ints}, 2), 42);
-#else // ^^^ workaround / no workaround vvv
     ranges::fill(R{some_writable_ints} | views::drop(2), 42);
-#endif // TRANSITION, VSO-1217687
     assert(ranges::equal(some_writable_ints, initializer_list<int>{0, 1, 42, 42}));
 }
 
@@ -516,4 +512,21 @@ int main() {
 
     STATIC_ASSERT((instantiation_test(), true));
     instantiation_test();
+
+    {
+        // Validate a view borrowed range
+        constexpr auto v =
+            views::iota(0ull, ranges::size(some_ints)) | views::transform([](auto i) { return some_ints[i]; });
+        STATIC_ASSERT(test_one(v, only_four_ints));
+        test_one(v, only_four_ints);
+    }
+
+    { // Validate that we can use something that is convertible to integral (GH-1957)
+        constexpr span s{some_ints};
+        auto r1 = s | views::drop(integral_constant<int, 4>{});
+        assert(ranges::equal(r1, only_four_ints));
+
+        auto r2 = s | views::drop(evil_convertible_to_difference{});
+        assert(ranges::equal(r2, only_four_ints));
+    }
 }

@@ -12,47 +12,45 @@
 
 using namespace std;
 
-#if defined(__EDG__) || _ITERATOR_DEBUG_LEVEL != 2 || defined(MSVC_INTERNAL_TESTING) // TRANSITION, VSO-1270433
 static constexpr int input[] = {0, 1, 2, 3, 4, 5};
-#endif // defined(__EDG__) || _ITERATOR_DEBUG_LEVEL != 2 || defined(MSVC_INTERNAL_TESTING)
 
 template <typename T>
 struct soccc_allocator {
     using value_type = T;
 
-    _CONSTEXPR20_CONTAINER soccc_allocator() noexcept = default;
-    _CONSTEXPR20_CONTAINER explicit soccc_allocator(const int id_) noexcept : id(id_), soccc_generation(0) {}
-    _CONSTEXPR20_CONTAINER explicit soccc_allocator(const int id_, const int soccc_generation_) noexcept
+    constexpr soccc_allocator() noexcept = default;
+    constexpr explicit soccc_allocator(const int id_) noexcept : id(id_), soccc_generation(0) {}
+    constexpr explicit soccc_allocator(const int id_, const int soccc_generation_) noexcept
         : id(id_), soccc_generation(soccc_generation_) {}
     template <typename U>
-    _CONSTEXPR20_CONTAINER soccc_allocator(const soccc_allocator<U>& other) noexcept
+    constexpr soccc_allocator(const soccc_allocator<U>& other) noexcept
         : id(other.id), soccc_generation(other.soccc_generation) {}
-    _CONSTEXPR20_CONTAINER soccc_allocator(const soccc_allocator& other) noexcept
+    constexpr soccc_allocator(const soccc_allocator& other) noexcept
         : id(other.id + 1), soccc_generation(other.soccc_generation) {}
 
-    _CONSTEXPR20_CONTAINER soccc_allocator& operator=(const soccc_allocator&) noexcept {
+    constexpr soccc_allocator& operator=(const soccc_allocator&) noexcept {
         return *this;
     }
 
-    _CONSTEXPR20_CONTAINER soccc_allocator select_on_container_copy_construction() const noexcept {
+    constexpr soccc_allocator select_on_container_copy_construction() const noexcept {
         return soccc_allocator(id, soccc_generation + 1);
     }
 
     template <typename U>
-    _CONSTEXPR20_CONTAINER bool operator==(const soccc_allocator<U>&) const noexcept {
+    constexpr bool operator==(const soccc_allocator<U>&) const noexcept {
         return true;
     }
 
-    _CONSTEXPR20_CONTAINER T* allocate(const size_t n) {
+    constexpr T* allocate(const size_t n) {
         return allocator<T>{}.allocate(n);
     }
 
-    _CONSTEXPR20_CONTAINER void deallocate(T* const p, const size_t n) noexcept {
+    constexpr void deallocate(T* const p, const size_t n) noexcept {
         allocator<T>{}.deallocate(p, n);
     }
 
     template <class... Args>
-    _CONSTEXPR20_CONTAINER void construct(T* const p, Args&&... args) {
+    constexpr void construct(T* const p, Args&&... args) {
         construct_at(p, forward<Args>(args)...);
     }
 
@@ -62,8 +60,7 @@ struct soccc_allocator {
 
 using vec = vector<int, soccc_allocator<int>>;
 
-_CONSTEXPR20_CONTAINER bool test_interface() {
-#if defined(__EDG__) || _ITERATOR_DEBUG_LEVEL != 2 || defined(MSVC_INTERNAL_TESTING) // TRANSITION, VSO-1270433
+constexpr bool test_interface() {
     { // constructors
 
         // Non allocator constructors
@@ -448,6 +445,10 @@ _CONSTEXPR20_CONTAINER bool test_interface() {
 
         emplaced.erase(emplaced.begin(), emplaced.begin() + 2);
         assert(emplaced.size() == 23);
+
+        emplaced.emplace(emplaced.cbegin(), 42);
+        assert(emplaced.size() == 24);
+        assert(emplaced.front() == 42);
 #endif // __EDG__
     }
 
@@ -506,12 +507,11 @@ _CONSTEXPR20_CONTAINER bool test_interface() {
         static_assert(is_same_v<remove_const_t<decltype(ge)>, bool>);
         assert(!ge);
     }
-#endif // defined(__EDG__) || _ITERATOR_DEBUG_LEVEL != 2 || defined(MSVC_INTERNAL_TESTING)
+
     return true;
 }
 
-_CONSTEXPR20_CONTAINER bool test_iterators() {
-#if defined(__EDG__) || _ITERATOR_DEBUG_LEVEL != 2 || defined(MSVC_INTERNAL_TESTING) // TRANSITION, VSO-1270433
+constexpr bool test_iterators() {
     vec range_constructed(begin(input), end(input));
 
 #if !defined(__EDG__) || _ITERATOR_DEBUG_LEVEL != 2 // TRANSITION, VSO-1273381
@@ -606,12 +606,11 @@ _CONSTEXPR20_CONTAINER bool test_iterators() {
     }
 
 #endif // !defined(__EDG__) || _ITERATOR_DEBUG_LEVEL != 2
-#endif // defined(__EDG__) || _ITERATOR_DEBUG_LEVEL != 2 || defined(MSVC_INTERNAL_TESTING)
+
     return true;
 }
 
-_CONSTEXPR20_CONTAINER bool test_growth() {
-#if defined(__EDG__) || _ITERATOR_DEBUG_LEVEL != 2 || defined(MSVC_INTERNAL_TESTING) // TRANSITION, VSO-1270433
+constexpr bool test_growth() {
     {
         vector<int> v(1000, 1729);
 
@@ -707,7 +706,7 @@ _CONSTEXPR20_CONTAINER bool test_growth() {
         assert(v.capacity() == 8000);
 #endif // __EDG__
     }
-#endif // defined(__EDG__) || _ITERATOR_DEBUG_LEVEL != 2 || defined(MSVC_INTERNAL_TESTING)
+
     return true;
 }
 
@@ -715,9 +714,7 @@ int main() {
     test_interface();
     test_iterators();
     test_growth();
-#ifdef __cpp_lib_constexpr_vector
     static_assert(test_interface());
     static_assert(test_iterators());
     static_assert(test_growth());
-#endif // __cpp_lib_constexpr_vector
 }

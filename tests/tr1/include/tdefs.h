@@ -81,13 +81,13 @@ int total_fail = 0;
 #ifdef AFMT
 int afmt = 1;
 #else // AFMT
-int afmt = 0;
+int afmt    = 0;
 #endif // AFMT
 
 #ifdef TERSE
 int terse = 1;
 #else // TERSE
-int terse = 0;
+int terse   = 0;
 #endif // TERSE
 
 #ifdef VERBOSE
@@ -249,12 +249,11 @@ void check_type(const char* label, const char* file_name, int line_number, const
 #endif // __cplusplus
 
 void check_double(const char* label, const char* file_name, int line_number, double left, double right) {
-    const char* afmtstr = " GOT %a != %a\n";
-    int ans             = left == right;
+    int ans = left == right;
 
     if (!terse && !ans) { // print hex or decimal floating-point
         if (afmt)
-            CSTD printf(afmtstr, left, right);
+            CSTD printf(" GOT %a != %a\n", left, right);
         else
             CSTD printf(" GOT %f != %f\n", left, right);
     }

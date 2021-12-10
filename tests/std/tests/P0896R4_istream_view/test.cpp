@@ -20,12 +20,13 @@ struct streamable {
     streamable() = default;
     streamable(const int input) : _val(input) {}
 
-    friend istream& operator>>(istream& is, streamable& right) noexcept {
+    template <class CharT, class Traits>
+    friend basic_istream<CharT, Traits>& operator>>(basic_istream<CharT, Traits>& is, streamable& right) noexcept {
         is >> right._val;
         return is;
     }
 
-    friend bool operator==(const streamable& left, const streamable& right) noexcept = default;
+    friend bool operator==(const streamable&, const streamable&) noexcept = default;
 
     int _val = 0;
 };
@@ -46,30 +47,20 @@ void test_one_type() {
     // validate constructors
     istringstream nonempty_stream{"0"};
     istringstream empty_intstream{};
-    R default_constructed{};
     R empty_constructed{empty_intstream};
     R non_empty_constructed{nonempty_stream};
 
-    static_assert(is_nothrow_constructible_v<R> == is_nothrow_default_constructible_v<T>);
     static_assert(is_nothrow_constructible_v<R, istream&> == is_nothrow_default_constructible_v<T>);
 
     // validate member begin
     // NOTE: begin() consumes the first token
-    (void) default_constructed.begin(); // default-constructed basic_istream_view doesn't model range.
     assert(empty_constructed.begin() == default_sentinel);
     assert(non_empty_constructed.begin() != default_sentinel);
 
-    // validate default constructed istream::iterator
-    {
-        const ranges::iterator_t<R> default_constructed_it;
-        assert(default_constructed_it == default_sentinel);
-        static_assert(noexcept(default_constructed_it == default_sentinel));
-    }
-
     // validate member end
-    static_assert(same_as<decltype(default_constructed.end()), default_sentinel_t>);
-    static_assert(noexcept(default_constructed.end()));
-    static_assert(noexcept(ranges::end(default_constructed)));
+    static_assert(same_as<decltype(empty_constructed.end()), default_sentinel_t>);
+    static_assert(noexcept(empty_constructed.end()));
+    static_assert(noexcept(ranges::end(empty_constructed)));
 
     // Nonexistent member functions
     static_assert(!CanMemberSize<R>);
@@ -83,28 +74,59 @@ void test_one_type() {
     ranges::copy(empty_constructed, input_empty);
     assert(ranges::equal(input_empty, expected_empty));
 
-    istringstream intstream{"0 1 2 3"};
-    T input_value[] = {-1, -1, -1, -1, -1};
-    ranges::copy(basic_istream_view<T, char>{intstream}, input_value);
-    assert(ranges::equal(input_value, expected));
+    { // using ranges::basic_istream_view with wide stream
+        wistringstream wintstream{L"0 1 2 3"};
+        T input_value[] = {-1, -1, -1, -1, -1};
+        ranges::copy(basic_istream_view<T, wchar_t>{wintstream}, input_value);
+        assert(ranges::equal(input_value, expected));
+    }
 
-    istringstream intstream_view{"0 1 2 3"};
-    T input_value_view[] = {-1, -1, -1, -1, -1};
-    ranges::copy(ranges::istream_view<T>(intstream_view), input_value_view);
-    static_assert(noexcept(ranges::istream_view<T>(intstream_view)));
-    assert(ranges::equal(input_value_view, expected));
+    { // using ranges::basic_istream_view with narrow stream
+        istringstream intstream{"0 1 2 3"};
+        T input_value[] = {-1, -1, -1, -1, -1};
+        ranges::copy(basic_istream_view<T, char>{intstream}, input_value);
+        assert(ranges::equal(input_value, expected));
+    }
+
+    { // Using ranges::istream_view
+        istringstream intstream{"0 1 2 3"};
+        T input[] = {-1, -1, -1, -1, -1};
+        ranges::copy(ranges::istream_view<T>(intstream), input);
+        static_assert(noexcept(ranges::istream_view<T>(intstream)));
+        assert(ranges::equal(input, expected));
+    }
+
+    { // Using ranges::wistream_view
+        wistringstream wintstream{L"0 1 2 3"};
+        T input[] = {-1, -1, -1, -1, -1};
+        ranges::copy(ranges::wistream_view<T>(wintstream), input);
+        static_assert(noexcept(ranges::wistream_view<T>(wintstream)));
+        assert(ranges::equal(input, expected));
+    }
+
+    { // Using views::istream with narrow stream
+        istringstream intstream{"0 1 2 3"};
+        T input[] = {-1, -1, -1, -1, -1};
+        ranges::copy(views::istream<T>(intstream), input);
+        static_assert(noexcept(views::istream<T>(intstream)));
+        assert(ranges::equal(input, expected));
+    }
+
+    { // Using views::istream with wide stream
+        wistringstream wintstream{L"0 1 2 3"};
+        T input[] = {-1, -1, -1, -1, -1};
+        ranges::copy(views::istream<T>(wintstream), input);
+        static_assert(noexcept(views::istream<T>(wintstream)));
+        assert(ranges::equal(input, expected));
+    }
 }
 
 istringstream some_stream{"42"};
 constexpr bool test_constexpr() {
-    // Default constructor is constexpr
-    ranges::basic_istream_view<int, char> empty{};
-
-    // begin is constexpr??!?
-    (void) empty.begin();
-
     // stream constructor is constexpr
     ranges::basic_istream_view<int, char> meow{some_stream};
+
+    // begin is constexpr, but realistically unusable in a constant expression
 
     // end is constexpr
     (void) meow.end();

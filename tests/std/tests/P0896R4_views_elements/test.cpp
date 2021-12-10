@@ -25,7 +25,7 @@ using pipeline_t = ranges::elements_view<V, 0>;
 
 template <class Rng>
 concept CanViewElements = requires(Rng&& r) {
-    views::elements<0>(static_cast<Rng&&>(r));
+    views::elements<0>(forward<Rng>(r));
 };
 
 constexpr P some_pairs[]        = {{0, -1}, {1, -2}, {2, -3}, {3, -4}, {4, -5}, {5, -6}, {6, -7}, {7, -8}};
@@ -36,7 +36,8 @@ template <ranges::input_range Rng>
 constexpr bool test_one(Rng&& rng) {
     using ranges::elements_view, ranges::bidirectional_range, ranges::common_range, ranges::contiguous_range,
         ranges::enable_borrowed_range, ranges::forward_range, ranges::input_range, ranges::iterator_t, ranges::prev,
-        ranges::random_access_range, ranges::range, ranges::range_reference_t, ranges::sentinel_t;
+        ranges::random_access_range, ranges::range, ranges::range_reference_t, ranges::sentinel_t,
+        ranges::borrowed_range;
 
     using V = views::all_t<Rng>;
     using R = elements_view<V, 0>;
@@ -46,6 +47,7 @@ constexpr bool test_one(Rng&& rng) {
     STATIC_ASSERT(bidirectional_range<R> == bidirectional_range<Rng>);
     STATIC_ASSERT(random_access_range<R> == random_access_range<Rng>);
     STATIC_ASSERT(!contiguous_range<R>);
+    STATIC_ASSERT(borrowed_range<R> == borrowed_range<V>);
 
     // ... with lvalue argument
     STATIC_ASSERT(CanViewElements<Rng&>);
@@ -64,8 +66,8 @@ constexpr bool test_one(Rng&& rng) {
     }
 
     // ... with const lvalue argument
-    STATIC_ASSERT(CanViewElements<const remove_reference_t<Rng>&> == (!is_view || copyable<V>) );
-    if constexpr (is_view && copyable<V>) {
+    STATIC_ASSERT(CanViewElements<const remove_reference_t<Rng>&> == (!is_view || copy_constructible<V>) );
+    if constexpr (is_view && copy_constructible<V>) {
         constexpr bool is_noexcept = is_nothrow_copy_constructible_v<V>;
 
         STATIC_ASSERT(same_as<decltype(views::elements<0>(as_const(rng))), R>);
@@ -77,8 +79,8 @@ constexpr bool test_one(Rng&& rng) {
         STATIC_ASSERT(same_as<decltype(as_const(rng) | pipeline), pipeline_t<const remove_reference_t<Rng>&>>);
         STATIC_ASSERT(noexcept(as_const(rng) | pipeline) == is_noexcept);
     } else if constexpr (!is_view) {
-        using RC                   = elements_view<views::all_t<const remove_reference_t<Rng>&>, 0>;
-        constexpr bool is_noexcept = is_nothrow_constructible_v<RC, const remove_reference_t<Rng>&>;
+        using RC                   = elements_view<ranges::ref_view<const remove_reference_t<Rng>>, 0>;
+        constexpr bool is_noexcept = true;
 
         STATIC_ASSERT(same_as<decltype(views::elements<0>(as_const(rng))), RC>);
         STATIC_ASSERT(noexcept(views::elements<0>(as_const(rng))) == is_noexcept);
@@ -91,7 +93,7 @@ constexpr bool test_one(Rng&& rng) {
     }
 
     // ... with rvalue argument
-    STATIC_ASSERT(CanViewElements<remove_reference_t<Rng>> == is_view || enable_borrowed_range<remove_cvref_t<Rng>>);
+    STATIC_ASSERT(CanViewElements<remove_reference_t<Rng>> == (is_view || movable<remove_reference_t<Rng>>) );
     if constexpr (is_view) {
         constexpr bool is_noexcept = is_nothrow_move_constructible_v<V>;
         STATIC_ASSERT(same_as<decltype(views::elements<0>(move(rng))), R>);
@@ -102,10 +104,9 @@ constexpr bool test_one(Rng&& rng) {
 
         STATIC_ASSERT(same_as<decltype(move(rng) | pipeline), pipeline_t<remove_reference_t<Rng>>>);
         STATIC_ASSERT(noexcept(move(rng) | pipeline) == is_noexcept);
-    } else if constexpr (enable_borrowed_range<remove_cvref_t<Rng>>) {
-        using S                    = decltype(ranges::subrange{move(rng)});
-        using RS                   = elements_view<S, 0>;
-        constexpr bool is_noexcept = noexcept(S{move(rng)});
+    } else if constexpr (movable<remove_reference_t<Rng>>) {
+        using RS                   = elements_view<ranges::owning_view<remove_reference_t<Rng>>, 0>;
+        constexpr bool is_noexcept = is_nothrow_move_constructible_v<V>;
 
         STATIC_ASSERT(same_as<decltype(views::elements<0>(move(rng))), RS>);
         STATIC_ASSERT(noexcept(views::elements<0>(move(rng))) == is_noexcept);
@@ -118,28 +119,14 @@ constexpr bool test_one(Rng&& rng) {
     }
 
     // ... with const rvalue argument
-    STATIC_ASSERT(CanViewElements<const remove_reference_t<Rng>> == (is_view && copyable<V>)
-                  || (!is_view && enable_borrowed_range<remove_cvref_t<Rng>>) );
-    if constexpr (is_view && copyable<V>) {
+    STATIC_ASSERT(CanViewElements<const remove_reference_t<Rng>> == (is_view && copy_constructible<V>) );
+    if constexpr (is_view && copy_constructible<V>) {
         constexpr bool is_noexcept = is_nothrow_copy_constructible_v<V>;
 
         STATIC_ASSERT(same_as<decltype(views::elements<0>(move(as_const(rng)))), R>);
         STATIC_ASSERT(noexcept(views::elements<0>(move(as_const(rng)))) == is_noexcept);
 
         STATIC_ASSERT(same_as<decltype(move(as_const(rng)) | views::elements<0>), R>);
-        STATIC_ASSERT(noexcept(move(as_const(rng)) | views::elements<0>) == is_noexcept);
-
-        STATIC_ASSERT(same_as<decltype(move(as_const(rng)) | pipeline), pipeline_t<const remove_reference_t<Rng>>>);
-        STATIC_ASSERT(noexcept(move(as_const(rng)) | pipeline) == is_noexcept);
-    } else if constexpr (!is_view && enable_borrowed_range<remove_cvref_t<Rng>>) {
-        using S                    = decltype(ranges::subrange{move(as_const(rng))});
-        using RS                   = elements_view<S, 0>;
-        constexpr bool is_noexcept = noexcept(S{move(as_const(rng))});
-
-        STATIC_ASSERT(same_as<decltype(views::elements<0>(move(as_const(rng)))), RS>);
-        STATIC_ASSERT(noexcept(views::elements<0>(move(as_const(rng)))) == is_noexcept);
-
-        STATIC_ASSERT(same_as<decltype(move(as_const(rng)) | views::elements<0>), RS>);
         STATIC_ASSERT(noexcept(move(as_const(rng)) | views::elements<0>) == is_noexcept);
 
         STATIC_ASSERT(same_as<decltype(move(as_const(rng)) | pipeline), pipeline_t<const remove_reference_t<Rng>>>);
@@ -407,12 +394,6 @@ int main() {
 
         STATIC_ASSERT((instantiation_test(), true));
         instantiation_test();
-    }
-
-    { // Validate a non-view borrowed range
-        constexpr span s{some_pairs};
-        STATIC_ASSERT(test_one(s));
-        test_one(s);
     }
 
     { // Validate a view borrowed range

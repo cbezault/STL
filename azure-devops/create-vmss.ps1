@@ -22,15 +22,15 @@ $Env:SuppressAzurePowerShellBreakingChangeWarnings = 'true'
 
 $Location = 'westus2'
 $Prefix = 'StlBuild-' + (Get-Date -Format 'yyyy-MM-dd')
-$VMSize = 'Standard_D32ds_v4'
+$VMSize = 'Standard_D32as_v4'
 $ProtoVMName = 'PROTOTYPE'
 $LiveVMPrefix = 'BUILD'
 $ImagePublisher = 'MicrosoftWindowsDesktop'
-$ImageOffer = 'Windows-10'
-$ImageSku = '20h2-ent-g2'
+$ImageOffer = 'windows-11'
+$ImageSku = 'win11-21h2-ent'
 
 $ProgressActivity = 'Creating Scale Set'
-$TotalProgress = 13
+$TotalProgress = 14
 $CurrentProgress = 1
 
 <#
@@ -303,6 +303,16 @@ Write-Progress `
   -PercentComplete (100 / $TotalProgress * $CurrentProgress++)
 
 Restart-AzVM -ResourceGroupName $ResourceGroupName -Name $ProtoVMName
+
+####################################################################################################
+Write-Progress `
+  -Activity $ProgressActivity `
+  -Status 'Sleeping after restart' `
+  -PercentComplete (100 / $TotalProgress * $CurrentProgress++)
+
+# The VM appears to be busy immediately after restarting.
+# This workaround waits for a minute before attempting to run sysprep.ps1.
+Start-Sleep -Seconds 60
 
 ####################################################################################################
 Write-Progress `
